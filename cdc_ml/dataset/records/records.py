@@ -3,12 +3,13 @@ from pathlib import Path
 from loguru import logger
 import pandas as pd
 import typer
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 
 from cdc_ml.config import RAW_DATA_DIR, DATABASE_URL, INTERIM_DATA_DIR
+from cdc_ml.dataset.records.schema import CleanedRecords
 
-from cdc_ml.constants import (
+from cdc_ml.dataset.records.constants import (
     RECORDS_DATE_PATTERN1,
     RECORDS_DATE_PATTERN2,
     TIMEZONE,
@@ -79,41 +80,57 @@ def drop_special_records(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def clean(df: pd.DataFrame) -> pd.DataFrame:
-
-    df = df.copy()
-    logger.info(f"Pre-Clean: {len(df)} rows")
-    # convert to proper lesson and booking timestamp
-    df["lesson_timestamp"] = to_lesson_timestamp(df["booking"])
-    df["booking_timestamp"] = to_booking_timestamp(df["created_at"])
-
-    # include mainstream customer only
-    time_to_include = pd.to_datetime(pd.Series(TIMESLOTS), format="%H:%M").dt.time
-    df = df[df["lesson_timestamp"].dt.time.isin(time_to_include)]
-    logger.info(f"Main customers only: {len(df)} row")
-
-    # normalize all names
-    df["username"] = normalize_username(df["username"])
-
-    # drop records due to special reasons
-    df = drop_special_records(df)
-    logger.info(f"Post-Clean: {len(df)} rows")
-    return df
-
-
-def fetch_raw(raw_out_path: Path):
+def fetch_df(raw_out_path: Path) -> None:
     engine = create_engine(DATABASE_URL)
-    df = pd.read_sql("SELECT * FROM records", engine)
+    cutoff = pd.Timestamp("2026-05-01", tz=TIMEZONE)  # 2026-05-01 00:00 SGT
+    df = pd.read_sql(
+        text("SELECT * FROM records WHERE created_at < :cutoff"),
+        engine,
+        params={"cutoff": cutoff},
+    )
     logger.info(f"Retrieved {len(df)} rows x {len(df.columns)} columns")
-
     raw_out_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(raw_out_path, index=False)
     logger.success(f"Saved raw records data to {raw_out_path}")
 
 
+def clean_df(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    logger.info(f"Pre-Clean: {len(df)} rows")
+
+    df["lesson_timestamp"] = to_lesson_timestamp(df["booking"])
+    df["booking_timestamp"] = to_booking_timestamp(df["created_at"])
+
+    time_to_include = pd.to_datetime(pd.Series(TIMESLOTS), format="%H:%M").dt.time
+    df = df[df["lesson_timestamp"].dt.time.isin(time_to_include)]
+    logger.info(f"Main customers only: {len(df)} row")
+
+    df["username"] = normalize_username(df["username"])
+    df = drop_special_records(df)
+    logger.info(f"Post-Clean: {len(df)} rows")
+
+    return CleanedRecords.validate(df, lazy=True)
+
+
+def clean_from_disk(raw_input_path: Path, interim_output_path: Path) -> None:
+    df = pd.read_csv(raw_input_path)
+    df = clean_df(df)
+    interim_output_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(interim_output_path, index=False)
+    logger.success(f"Records cleaned and saved to {interim_output_path}")
+
+
 @app.command()
 def fetch(raw_out_path: Path = RAW_DATA_DIR / "records.csv"):
-    fetch_raw(raw_out_path)
+    fetch_df(raw_out_path)
+
+
+@app.command()
+def clean(
+    raw_input_path: Path = RAW_DATA_DIR / "records.csv",
+    interim_output_path: Path = INTERIM_DATA_DIR / "interim_records.parquet",
+):
+    clean_from_disk(raw_input_path, interim_output_path)
 
 
 @app.command()
@@ -121,15 +138,10 @@ def run(
     raw_path: Path = RAW_DATA_DIR / "records.csv",
     interim_output_path: Path = INTERIM_DATA_DIR / "interim_records.parquet",
 ):
-
-    logger.info("Fetch data from Neon...")
-    fetch_raw(raw_path)
+    logger.info("Fetching data from Neon...")
+    fetch_df(raw_path)
     logger.info("Cleaning records...")
-    df = pd.read_csv(raw_path)
-    df = clean(df)
-    interim_output_path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_parquet(interim_output_path, index=False)
-    logger.success(f"Records cleaned and saved to {interim_output_path}")
+    clean_from_disk(raw_path, interim_output_path)
 
 
 if __name__ == "__main__":
