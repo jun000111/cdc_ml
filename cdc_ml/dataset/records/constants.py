@@ -1,5 +1,3 @@
-TIMEZONE = "Asia/Singapore"
-TIMESLOTS = ["08:30", "10:20", "12:45", "14:35", "16:25", "18:50", "20:40"]
 RECORDS_DATE_PATTERN1 = r"Date:\s*(\d{4}-\d{2}-\d{2})\s*,\s*Time:\s*(.+)"
 RECORDS_DATE_PATTERN2 = r"Date:\s*(\d{2}/\d{2}/\d{4}),\s*Time:\s*(\d{2}:\d{2}\s*-\s*\d{2}:\d{2})"
 NAMES_TO_DROP = ["test", "0", "00860768", "1", "8", "jjj", "00", "S", "G", "v0057577"]

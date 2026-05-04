@@ -2,7 +2,7 @@ import pandas as pd
 import pandera.pandas as pa
 from pandera.typing import Series
 
-from cdc_ml.dataset.records.constants import TIMEZONE
+from cdc_ml.dataset.constants import TIMEZONE
 
 
 class CleanedRecords(pa.DataFrameModel):

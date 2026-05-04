@@ -12,12 +12,11 @@ from cdc_ml.dataset.records.schema import CleanedRecords
 from cdc_ml.dataset.records.constants import (
     RECORDS_DATE_PATTERN1,
     RECORDS_DATE_PATTERN2,
-    TIMEZONE,
     NAME_DIC,
     NAMES_TO_DROP,
     JUN_DATES,
-    TIMESLOTS,
 )
+from cdc_ml.dataset.constants import TIMESLOTS, TIMEZONE
 
 app = typer.Typer()
 
@@ -117,7 +116,6 @@ def clean_from_disk(raw_input_path: Path, interim_output_path: Path) -> None:
     df = clean_df(df)
     interim_output_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(interim_output_path, index=False)
-    logger.success(f"Records cleaned and saved to {interim_output_path}")
 
 
 @app.command()
@@ -128,7 +126,7 @@ def fetch(raw_out_path: Path = RAW_DATA_DIR / "records.csv"):
 @app.command()
 def clean(
     raw_input_path: Path = RAW_DATA_DIR / "records.csv",
-    interim_output_path: Path = INTERIM_DATA_DIR / "interim_records.parquet",
+    interim_output_path: Path = INTERIM_DATA_DIR / "records.parquet",
 ):
     clean_from_disk(raw_input_path, interim_output_path)
 
@@ -136,12 +134,13 @@ def clean(
 @app.command()
 def run(
     raw_path: Path = RAW_DATA_DIR / "records.csv",
-    interim_output_path: Path = INTERIM_DATA_DIR / "interim_records.parquet",
+    interim_output_path: Path = INTERIM_DATA_DIR / "records.parquet",
 ):
     logger.info("Fetching data from Neon...")
     fetch_df(raw_path)
     logger.info("Cleaning records...")
     clean_from_disk(raw_path, interim_output_path)
+    logger.success(f"Records cleaned and saved to {interim_output_path}")
 
 
 if __name__ == "__main__":
