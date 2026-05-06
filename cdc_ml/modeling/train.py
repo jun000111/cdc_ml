@@ -13,7 +13,7 @@ app = typer.Typer()
 def main(
     # ---- REPLACE DEFAULT PATHS AS APPROPRIATE ----
     features_path: Path = PROCESSED_DATA_DIR / "features.csv",
-    labels_path: Path = PROCESSED_DATA_DIR / "labels.csv",
+    lables_path: Path = PROCESSED_DATA_DIR / "lables.csv",
     model_path: Path = MODELS_DIR / "model.pkl",
     # -----------------------------------------
 ):

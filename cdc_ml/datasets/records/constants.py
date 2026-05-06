@@ -1,6 +1,6 @@
 RECORDS_DATE_PATTERN1 = r"Date:\s*(\d{4}-\d{2}-\d{2})\s*,\s*Time:\s*(.+)"
 RECORDS_DATE_PATTERN2 = r"Date:\s*(\d{2}/\d{2}/\d{4}),\s*Time:\s*(\d{2}:\d{2}\s*-\s*\d{2}:\d{2})"
-NAMES_TO_DROP = ["test", "0", "00860768", "1", "8", "jjj", "00", "S", "G", "v0057577"]
+NAMES_TO_DROP = ["test", "0", "00860768", "1", "8", "jjj", "00", "S", "G", "v0057577", "zen"]
 NAME_DIC = {
     "jun": ["zj", "1945631554", "00860768"],
     "brendon": ["brandon"],

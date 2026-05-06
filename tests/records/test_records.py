@@ -2,11 +2,11 @@ import pytest
 import pandas as pd
 from pandas.testing import assert_series_equal
 
-from cdc_ml.dataset.records.records import (
+from cdc_ml.datasets.records.records import (
     flatten_name_dic,
     normalize_username,
-    to_lesson_timestamp,
-    to_booking_timestamp,
+    to_lesson_at,
+    to_booking_at,
     handle_special_customers,
 )
 
@@ -21,14 +21,14 @@ class TestFlattenDic:
 
 class TestToLessonTimestamp:
     def test_tz_aware(self, raw_records_df, sgt):
-        converted = to_lesson_timestamp(raw_records_df["booking"])
+        converted = to_lesson_at(raw_records_df["booking"])
 
         assert str(converted.dt.tz) == sgt
 
 
 class TestToBookingTimestamp:
     def test_tz_aware(self, raw_records_df, sgt):
-        converted = to_booking_timestamp(raw_records_df["created_at"])
+        converted = to_booking_at(raw_records_df["created_at"])
 
         assert str(converted.dt.tz) == sgt
 

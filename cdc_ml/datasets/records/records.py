@@ -6,22 +6,28 @@ import typer
 from sqlalchemy import create_engine, text
 
 
-from cdc_ml.config import RAW_DATA_DIR, DATABASE_URL, INTERIM_DATA_DIR
-from cdc_ml.dataset.records.schema import CleanedRecords
+from cdc_ml.config import (
+    RAW_DATA_DIR,
+    DATABASE_URL,
+    INTERIM_DATA_DIR,
+    INTERIM_RECORDS_PARQUET,
+    RAW_RECORDS_CSV,
+)
+from cdc_ml.datasets.records.schema import CleanedRecords
 
-from cdc_ml.dataset.records.constants import (
+from cdc_ml.datasets.records.constants import (
     RECORDS_DATE_PATTERN1,
     RECORDS_DATE_PATTERN2,
     NAME_DIC,
     NAMES_TO_DROP,
     JUN_DATES,
 )
-from cdc_ml.dataset.constants import TIMESLOTS, TIMEZONE
+from cdc_ml.datasets.constants import TIMESLOTS, TIMEZONE
 
 app = typer.Typer()
 
 
-def to_lesson_timestamp(series: pd.Series) -> pd.Series:
+def to_lesson_at(series: pd.Series) -> pd.Series:
     # extract the date and time patterns for the 2 types of booking info
     ext1 = series.str.extract(RECORDS_DATE_PATTERN1)
     ext2 = series.str.extract(RECORDS_DATE_PATTERN2)
@@ -40,11 +46,12 @@ def to_lesson_timestamp(series: pd.Series) -> pd.Series:
     return full_date_time
 
 
-def to_booking_timestamp(series: pd.Series) -> pd.Series:
+def to_booking_at(series: pd.Series) -> pd.Series:
     return pd.to_datetime(series).dt.tz_convert(TIMEZONE)
 
 
 def flatten_name_dic(name_dic: dict[str, list[str]]) -> dict[str, str]:
+    # the source dic have to be flattened out to be useable and pass into pandas
     flattened = {}
     for name, name_list in name_dic.items():
         for alternate_name in name_list:
@@ -55,26 +62,45 @@ def flatten_name_dic(name_dic: dict[str, list[str]]) -> dict[str, str]:
 
 
 def normalize_username(series: pd.Series) -> pd.Series:
+    """standardize and normalize the usernames
+
+    including convert username to lowercase and also uniform all alternate customers names
+    """
     normalized_username = series.str.lower()
     flattened_name_dic = flatten_name_dic(NAME_DIC)
+
+    # some customers have alternate names , merge them as one
     normalized_username = normalized_username.replace(flattened_name_dic)
     return normalized_username
 
 
 def handle_special_customers(df: pd.DataFrame) -> pd.DataFrame:
-    # jun is the admin and also the customer , only include actual booking as a customer
+    """some records are due to testing and is not valid , some records are weird and should not be included"""
     jun_proper_booking = pd.to_datetime(JUN_DATES).date
 
-    jun_to_filter = (df["username"] != "jun") | (
-        df["booking_timestamp"].dt.date.isin(jun_proper_booking)
+    jun_to_exclude = (df["username"] == "jun") & ~(
+        df["booking_at"].dt.date.isin(jun_proper_booking)
+    )
+    pand_to_exclude = (df["username"] == "jy") & df["booking_at"].dt.date.isin(
+        pd.to_datetime(["2025-09-06"]).date
     )
 
-    df = df.loc[jun_to_filter]
+    brendon_to_exclude = (df["username"] == "brendon") & df["booking_at"].dt.date.isin(
+        pd.to_datetime(["2025-11-05"]).date
+    )
+
+    issac_to_exclude = (df["username"] == "issac") & df["booking_at"].dt.date.isin(
+        pd.to_datetime(["2025-12-03"]).date
+    )
+    df = df.loc[~jun_to_exclude & ~pand_to_exclude & ~brendon_to_exclude & ~issac_to_exclude]
     return df
 
 
 def drop_special_records(df: pd.DataFrame) -> pd.DataFrame:
+    """drop some weird and special records due to human/machine error"""
     df = handle_special_customers(df)
+
+    # drop the rest of the records under testing/invalid names
     df = df[~df["username"].isin(NAMES_TO_DROP)]
     return df
 
@@ -93,18 +119,25 @@ def fetch_df(raw_out_path: Path) -> None:
     logger.success(f"Saved raw records data to {raw_out_path}")
 
 
+def filter_main_customers(timeslots: list, df: pd.DataFrame):
+    """only include records that is in the TIMESLOTS , these are the main customers that the model will be working on"""
+    time_to_include = pd.to_datetime(pd.Series(timeslots), format="%H:%M").dt.time
+    return df.loc[df["lesson_at"].dt.time.isin(time_to_include)]
+
+
 def clean_df(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     logger.info(f"Pre-Clean: {len(df)} rows")
 
-    df["lesson_timestamp"] = to_lesson_timestamp(df["booking"])
-    df["booking_timestamp"] = to_booking_timestamp(df["created_at"])
+    # convert both booking and created_at columns to standard tz aware timestamp format
+    df["lesson_at"] = to_lesson_at(df["booking"])
+    df["booking_at"] = to_booking_at(df["created_at"])
 
-    time_to_include = pd.to_datetime(pd.Series(TIMESLOTS), format="%H:%M").dt.time
-    df = df[df["lesson_timestamp"].dt.time.isin(time_to_include)]
+    df = filter_main_customers(TIMESLOTS, df)
     logger.info(f"Main customers only: {len(df)} row")
 
     df["username"] = normalize_username(df["username"])
+
     df = drop_special_records(df)
     logger.info(f"Post-Clean: {len(df)} rows")
 
@@ -113,33 +146,31 @@ def clean_df(df: pd.DataFrame) -> pd.DataFrame:
 
 def clean_from_disk(raw_input_path: Path, interim_output_path: Path) -> None:
     df = pd.read_csv(raw_input_path)
-    df = clean_df(df)
+    df_cleaned = clean_df(df)
     interim_output_path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_parquet(interim_output_path, index=False)
+    df_cleaned.to_parquet(interim_output_path, index=False)
 
 
 @app.command()
-def fetch(raw_out_path: Path = RAW_DATA_DIR / "records.csv"):
+def fetch(raw_out_path: Path = RAW_RECORDS_CSV):
     fetch_df(raw_out_path)
 
 
 @app.command()
 def clean(
-    raw_input_path: Path = RAW_DATA_DIR / "records.csv",
-    interim_output_path: Path = INTERIM_DATA_DIR / "records.parquet",
+    raw_input_path: Path = RAW_RECORDS_CSV, interim_output_path: Path = INTERIM_RECORDS_PARQUET
 ):
     clean_from_disk(raw_input_path, interim_output_path)
 
 
 @app.command()
 def run(
-    raw_path: Path = RAW_DATA_DIR / "records.csv",
-    interim_output_path: Path = INTERIM_DATA_DIR / "records.parquet",
+    raw_input_path: Path = RAW_RECORDS_CSV, interim_output_path: Path = INTERIM_RECORDS_PARQUET
 ):
     logger.info("Fetching data from Neon...")
-    fetch_df(raw_path)
+    fetch_df(raw_input_path)
     logger.info("Cleaning records...")
-    clean_from_disk(raw_path, interim_output_path)
+    clean_from_disk(raw_input_path, interim_output_path)
     logger.success(f"Records cleaned and saved to {interim_output_path}")
 
 
