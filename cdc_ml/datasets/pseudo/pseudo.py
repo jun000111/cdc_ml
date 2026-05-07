@@ -30,7 +30,9 @@ def normalize_username(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def clean_columns(df: pd.DataFrame) -> pd.DataFrame:
-    return df.drop(columns=["lesson_date", "lesson_time", "booking date", "booking time"])
+    return df.rename(columns={"type_of_booking": "booking_type", "name": "username"}).drop(
+        columns=["lesson_date", "lesson_time", "booking date", "booking time", "id"]
+    )
 
 
 def clean_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -52,6 +54,7 @@ def clean_from_disk(
     interim_output_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(interim_output_path, index=False)
     logger.info(f"After cleaning : {len(df)} rows x {len(df.columns)}")
+    logger.success(f"Saved cleaned pseudo to {interim_output_path} ")
 
 
 @app.command()
@@ -59,9 +62,7 @@ def run(
     raw_input_path: Path = EXTERNAL_PSEUDO_EXCEL,
     interim_output_path: Path = INTERIM_PSEUDO_PARQUET,
 ):
-    logger.info("Starting...")
     clean_from_disk(raw_input_path, interim_output_path)
-    logger.success(f"Saved cleaned pseudo to {interim_output_path} ")
 
 
 if __name__ == "__main__":

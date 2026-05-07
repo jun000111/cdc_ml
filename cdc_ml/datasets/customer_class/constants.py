@@ -1,5 +1,6 @@
 CUSTOMER_CLASS_DIC = {
     "ajithak": "01. Class 3 Motorcar",
+    "brendon": "03. Class 3A Motorcar",
     "bryan": "03. Class 3A Motorcar",
     "lucinda": "03. Class 3A Motorcar",
     "sara": "03. Class 3A Motorcar",

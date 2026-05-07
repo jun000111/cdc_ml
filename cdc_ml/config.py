@@ -23,6 +23,7 @@ REPORTS_DIR = PROJ_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
 
 DATABASE_URL = os.environ["DATABASE_URL"]
+SALT = os.environ["SALT"]
 
 RAW_RECORDS_CSV = RAW_DATA_DIR / "records.csv"
 INTERIM_RECORDS_PARQUET = INTERIM_DATA_DIR / "records.parquet"
@@ -37,6 +38,10 @@ INTERIM_CYCLE_PARQUET = INTERIM_DATA_DIR / "cycle.parquet"
 
 RAW_CLASS_CSV = RAW_DATA_DIR / "customer_class.csv"
 INTERIM_CLASS_PARQUET = INTERIM_DATA_DIR / "customer_class.parquet"
+
+PROCESSED_CLASS_RECORDS_PARQUET = PROCESSED_DATA_DIR / "class_records.parquet"
+
+PROCESSED_POLL_PARQUET = PROCESSED_DATA_DIR / "polls.parquet"
 # If tqdm is installed, configure loguru with tqdm.write
 # https://github.com/Delgan/loguru/issues/135
 try:

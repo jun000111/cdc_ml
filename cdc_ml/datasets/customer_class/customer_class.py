@@ -8,14 +8,11 @@ from cdc_ml.datasets.customer_class.schema import CleanedClass
 import typer
 
 from cdc_ml.config import (
-    INTERIM_DATA_DIR,
-    RAW_DATA_DIR,
     DATABASE_URL,
     RAW_CLASS_CSV,
     INTERIM_COMPLETE_RECORDS_PARQUET,
     INTERIM_CLASS_PARQUET,
 )
-from cdc_ml.datasets.records_pseudo.schema import RefinedRecords
 from cdc_ml.datasets.customer_class.constants import (
     INVALID_CLASS,
     CUSTOMER_CLASS_DIC,
@@ -69,15 +66,11 @@ def modify_class_type(df_class: pd.DataFrame) -> pd.DataFrame:
     return assigned_one_team
 
 
-def fetch_raw(
-    raw_output_path: Path = RAW_CLASS_CSV,
-):
-    logger.info("Fetching data from Neon...")
-    engine = create_engine(DATABASE_URL)
-    df = pd.read_sql("select nickname, course_type from customers", engine)
-    logger.info(f"Fetched {len(df)} rows x {len(df.columns)}")
-    df.to_csv(raw_output_path, index=False)
-    logger.success(f"Saved to {raw_output_path} ")
+def all_user_included(df_class: pd.DataFrame, df_records: pd.DataFrame) -> None:
+    missing_list = df_records.loc[~df_records["username"].isin(df_class["username"]), "username"]
+    if not missing_list.empty:
+        missing = missing_list.unique().tolist()
+        raise ValueError(f"Username not assigned with a class :{missing}")
 
 
 def generate_class_df(df_class: pd.DataFrame, df_records: pd.DataFrame):
@@ -89,16 +82,53 @@ def generate_class_df(df_class: pd.DataFrame, df_records: pd.DataFrame):
     df_cleaned = add_non_standard_records(df_cleaned)
 
     df_cleaned = modify_class_type(df_cleaned)
-    logger.info(f"Cleaning complete , new df: {len(df_cleaned)} rows x {len(df_cleaned.columns)}")
+
+    all_user_included(df_cleaned, df_records)
 
     return CleanedClass.validate(df_cleaned)
+
+
+def fetch_from_disk(
+    raw_output_path: Path = RAW_CLASS_CSV,
+):
+    logger.info("Fetching data from Neon...")
+    engine = create_engine(DATABASE_URL)
+    df = pd.read_sql("select nickname, course_type from customers", engine)
+    logger.info(f"Fetched {len(df)} rows x {len(df.columns)}")
+    df.to_csv(raw_output_path, index=False)
+    logger.success(f"Saved to {raw_output_path} ")
+
+
+def generate_from_disk(
+    raw_input_path: Path = RAW_CLASS_CSV,
+    interim_output_path: Path = INTERIM_CLASS_PARQUET,
+    interim_input_path: Path = INTERIM_COMPLETE_RECORDS_PARQUET,
+):
+
+    df_class = pd.read_csv(raw_input_path)
+    df_records = pd.read_parquet(interim_input_path)
+    df = generate_class_df(df_class, df_records)
+
+    logger.info(f"Total: {len(df)} rows x {len(df.columns)}")
+    interim_output_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(interim_output_path)
+    logger.success(f"Generated customer class at {interim_output_path}")
+
+
+@app.command()
+def generate(
+    raw_input_path: Path = RAW_CLASS_CSV,
+    interim_output_path: Path = INTERIM_CLASS_PARQUET,
+    interim_input_path: Path = INTERIM_COMPLETE_RECORDS_PARQUET,
+):
+    generate_from_disk(raw_input_path, interim_output_path, interim_input_path)
 
 
 @app.command()
 def fetch(
     raw_output_path: Path = RAW_CLASS_CSV,
 ):
-    fetch_raw(raw_output_path)
+    fetch_from_disk(raw_output_path)
 
 
 @app.command()
@@ -108,13 +138,12 @@ def run(
     interim_output_path: Path = INTERIM_CLASS_PARQUET,
     interim_input_path: Path = INTERIM_COMPLETE_RECORDS_PARQUET,
 ):
-    fetch(raw_output_path)
-    df_class = pd.read_csv(raw_input_path)
-    df_records = pd.read_parquet(interim_input_path)
-    df = generate_class_df(df_class, df_records)
-    interim_output_path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_parquet(interim_output_path)
-    logger.success(f"Generated customer class at {interim_output_path}")
+    fetch_from_disk(raw_output_path)
+    generate_from_disk(
+        raw_input_path,
+        interim_output_path,
+        interim_input_path,
+    )
 
 
 if __name__ == "__main__":

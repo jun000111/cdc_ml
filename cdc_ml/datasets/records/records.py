@@ -105,24 +105,16 @@ def drop_special_records(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def fetch_df(raw_out_path: Path) -> None:
-    engine = create_engine(DATABASE_URL)
-    cutoff = pd.Timestamp("2026-05-01", tz=TIMEZONE)  # 2026-05-01 00:00 SGT
-    df = pd.read_sql(
-        text("SELECT * FROM records WHERE created_at < :cutoff"),
-        engine,
-        params={"cutoff": cutoff},
-    )
-    logger.info(f"Retrieved {len(df)} rows x {len(df.columns)} columns")
-    raw_out_path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(raw_out_path, index=False)
-    logger.success(f"Saved raw records data to {raw_out_path}")
-
-
 def filter_main_customers(timeslots: list, df: pd.DataFrame):
     """only include records that is in the TIMESLOTS , these are the main customers that the model will be working on"""
     time_to_include = pd.to_datetime(pd.Series(timeslots), format="%H:%M").dt.time
     return df.loc[df["lesson_at"].dt.time.isin(time_to_include)]
+
+
+def clean_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """assign booking type 0 to all proper bookings
+    drop irrelevant/modified columns"""
+    return df.assign(booking_type=0).drop(columns=["booking", "created_at", "id"])
 
 
 def clean_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -139,21 +131,39 @@ def clean_df(df: pd.DataFrame) -> pd.DataFrame:
     df["username"] = normalize_username(df["username"])
 
     df = drop_special_records(df)
+    df = clean_columns(df)
     logger.info(f"Post-Clean: {len(df)} rows")
 
     return CleanedRecords.validate(df, lazy=True)
 
 
 def clean_from_disk(raw_input_path: Path, interim_output_path: Path) -> None:
+    logger.info("Cleaning records...")
     df = pd.read_csv(raw_input_path)
     df_cleaned = clean_df(df)
     interim_output_path.parent.mkdir(parents=True, exist_ok=True)
     df_cleaned.to_parquet(interim_output_path, index=False)
+    logger.success(f"Records cleaned and saved to {interim_output_path}")
+
+
+def fetch_from_disk(raw_out_path: Path) -> None:
+    logger.info("Fetching data from Neon...")
+    engine = create_engine(DATABASE_URL)
+    cutoff = pd.Timestamp("2026-05-01", tz=TIMEZONE)  # 2026-05-01 00:00 SGT
+    df = pd.read_sql(
+        text("SELECT * FROM records WHERE created_at < :cutoff"),
+        engine,
+        params={"cutoff": cutoff},
+    )
+    logger.info(f"Retrieved {len(df)} rows x {len(df.columns)} columns")
+    raw_out_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(raw_out_path, index=False)
+    logger.success(f"Saved raw records data to {raw_out_path}")
 
 
 @app.command()
 def fetch(raw_out_path: Path = RAW_RECORDS_CSV):
-    fetch_df(raw_out_path)
+    fetch_from_disk(raw_out_path)
 
 
 @app.command()
@@ -167,11 +177,8 @@ def clean(
 def run(
     raw_input_path: Path = RAW_RECORDS_CSV, interim_output_path: Path = INTERIM_RECORDS_PARQUET
 ):
-    logger.info("Fetching data from Neon...")
-    fetch_df(raw_input_path)
-    logger.info("Cleaning records...")
+    fetch_from_disk(raw_input_path)
     clean_from_disk(raw_input_path, interim_output_path)
-    logger.success(f"Records cleaned and saved to {interim_output_path}")
 
 
 if __name__ == "__main__":

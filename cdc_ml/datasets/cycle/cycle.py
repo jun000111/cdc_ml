@@ -60,7 +60,6 @@ def clean_df(df: pd.DataFrame) -> pd.DataFrame:
     df["cycle_end"] = to_cycle_timestamp(df["cycle end date"], df["cycle end time"])
     df = clean_columns(df)
 
-    logger.info(f"Post cleaning:{len(df)} rows x {len(df.columns)} columns")
     return CleanedCycle.validate(df)
 
 
@@ -69,10 +68,13 @@ def clean_from_disk(
     interim_output_path: Path = INTERIM_CYCLE_PARQUET,
 ):
 
+    logger.info("Starting...")
     df = pd.read_excel(external_input_path)
     df = clean_df(df)
+    logger.info(f"Total:{len(df)} rows x {len(df.columns)} columns")
     interim_output_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(interim_output_path, index=False)
+    logger.success(f"Cleaned and saved to {interim_output_path}")
 
 
 @app.command()
@@ -80,9 +82,7 @@ def run(
     external_input_path: Path = EXTERNAL_CYCLE_EXCEL,
     interim_output_path: Path = INTERIM_CYCLE_PARQUET,
 ):
-    logger.info("Starting...")
     clean_from_disk(external_input_path, interim_output_path)
-    logger.success(f"Cleaned and saved to {interim_output_path}")
 
 
 if __name__ == "__main__":

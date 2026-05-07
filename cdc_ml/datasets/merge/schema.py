@@ -5,7 +5,7 @@ from pandera.typing import Series
 from cdc_ml.datasets.constants import TIMEZONE
 
 
-class RefinedRecords(pa.DataFrameModel):
+class MergeRecordsPseudo(pa.DataFrameModel):
 
     lesson_at: Series[pd.DatetimeTZDtype] = pa.Field(
         dtype_kwargs={"tz": str(TIMEZONE)},
@@ -26,3 +26,14 @@ class RefinedRecords(pa.DataFrameModel):
         results = pd.Series(True, index=df.index)
         results[mask] = df.loc[mask, "booking_at"] < df.loc[mask, "lesson_at"]
         return results
+
+
+class MergeRecordsClass(pa.DataFrameModel):
+    booking_type: Series[int] = pa.Field(isin=[0, 1, 2])
+    class_type: Series[str] = pa.Field(isin=["3", "3a"])
+    is_one_team: Series[int] = pa.Field(isin=[0, 1])
+
+    @pa.dataframe_check
+    def user_has_same_class_team(cls, df: pd.DataFrame) -> pd.Series:
+        counts = df.groupby("username")[["class_type", "is_one_team"]].transform("nunique")
+        return (counts <= 1).all(axis=1)
