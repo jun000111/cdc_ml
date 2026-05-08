@@ -5,7 +5,7 @@ import pandas as pd
 
 from cdc_ml.config import (
     BOOKING_CYCLES_INTERIM,
-    RECORDS_INTERIM,
+    RECORDS_PROCESSED,
     POLLS_PROCESSED,
     CUSTOMER_CLASS_INTERIM,
 )
@@ -106,7 +106,7 @@ def generate_df(
 
 def generate_on_disk(
     interim_input_cycle_path: Path = BOOKING_CYCLES_INTERIM,
-    interim_input_complete_records_path: Path = RECORDS_INTERIM,
+    interim_input_complete_records_path: Path = RECORDS_PROCESSED,
     interim_customer_class_path: Path = CUSTOMER_CLASS_INTERIM,
     processed_output_path: Path = POLLS_PROCESSED,
 ):
@@ -125,7 +125,7 @@ def generate_on_disk(
 @app.command()
 def run(
     interim_input_cycle_path: Path = BOOKING_CYCLES_INTERIM,
-    interim_input_complete_records_path: Path = RECORDS_INTERIM,
+    interim_input_complete_records_path: Path = RECORDS_PROCESSED,
     interim_customer_class_path: Path = CUSTOMER_CLASS_INTERIM,
     processed_output_path: Path = POLLS_PROCESSED,
 ):

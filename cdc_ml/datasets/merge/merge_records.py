@@ -5,7 +5,7 @@ from loguru import logger
 import typer
 
 from cdc_ml.config import (
-    RECORDS_INTERIM,
+    RECORDS_PROCESSED,
     PROPER_RECORDS_INTERIM,
     PSEUDO_BOOKINGS_INTERIM,
     CUSTOMER_CLASS_INTERIM,
@@ -46,7 +46,7 @@ def merge_df(
 
 
 def merge_on_disk(
-    interim_output_path: Path = RECORDS_INTERIM,
+    interim_output_path: Path = RECORDS_PROCESSED,
     records_input_path: Path = PROPER_RECORDS_INTERIM,
     pseudo_input_path: Path = PSEUDO_BOOKINGS_INTERIM,
     class_input_path: Path = CUSTOMER_CLASS_INTERIM,
@@ -65,7 +65,7 @@ def merge_on_disk(
 
 @app.command()
 def merge(
-    interim_output_path: Path = RECORDS_INTERIM,
+    interim_output_path: Path = RECORDS_PROCESSED,
     records_input_path: Path = PROPER_RECORDS_INTERIM,
     pseudo_input_path: Path = PSEUDO_BOOKINGS_INTERIM,
     class_input_path: Path = CUSTOMER_CLASS_INTERIM,

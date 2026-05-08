@@ -10,7 +10,7 @@ import typer
 from cdc_ml.config import (
     DATABASE_URL,
     CUSTOMER_CLASS_RAW,
-    RECORDS_INTERIM,
+    RECORDS_PROCESSED,
     CUSTOMER_CLASS_INTERIM,
 )
 from cdc_ml.datasets.customer_class.constants import (

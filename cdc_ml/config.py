@@ -37,7 +37,10 @@ BOOKING_CYCLES_INTERIM = INTERIM_DATA_DIR / "booking_cycles.parquet"
 CUSTOMER_CLASS_RAW = RAW_DATA_DIR / "customer_class.csv"
 CUSTOMER_CLASS_INTERIM = INTERIM_DATA_DIR / "customer_class.parquet"
 
-RECORDS_INTERIM = PROCESSED_DATA_DIR / "records.parquet"
+PREFERENCE_EXTERNAL = EXTERNAL_DATA_DIR / "preference.xlsx"
+PREFERENCE_PROCESSED = PROCESSED_DATA_DIR / "preference.parquet"
+
+RECORDS_PROCESSED = PROCESSED_DATA_DIR / "records.parquet"
 POLLS_PROCESSED = PROCESSED_DATA_DIR / "polls.parquet"
 
 # If tqdm is installed, configure loguru with tqdm.write
