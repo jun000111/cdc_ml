@@ -65,36 +65,31 @@ def get_int_array(value: str | None) -> tuple[int, ...]:
 
 
 def all_records_valid(df_pref: pd.DataFrame, df_records: pd.DataFrame) -> None:
-    rows = []
-    for row in df_pref.itertuples():
-        times = []
-        if row.t_0830 == 1:
-            times.append("08:30")
-        if row.t_1020 == 1:
-            times.append("10:20")
-        if row.t_1245 == 1:
-            times.append("12:45")
-        if row.t_1435 == 1:
-            times.append("14:35")
-        if row.t_1625 == 1:
-            times.append("16:25")
-        if row.t_1850 == 1:
-            times.append("18:50")
-        if row.t_2040 == 1:
-            times.append("20:40")
 
-        for time in times:
-            rows.append(
-                {
-                    "id": row.id,
-                    "username": row.username,
-                    "pref_at": pd.to_datetime(str(row.date) + " " + time).tz_localize(
-                        "Asia/Singapore"
-                    ),
-                }
-            )
+    TIME_COLS = {
+        "t_0830": "08:30",
+        "t_1020": "10:20",
+        "t_1245": "12:45",
+        "t_1435": "14:35",
+        "t_1625": "16:25",
+        "t_1850": "18:50",
+        "t_2040": "20:40",
+    }
 
-    df_pref_time = pd.DataFrame(rows)
+    df_long = df_pref.melt(
+        id_vars=["id", "username", "date"],
+        value_vars=list(TIME_COLS),
+        var_name="slot",
+        value_name="enabled",
+    ).query("enabled == 1")
+
+    # Build all pref_at timestamps in a single vectorized call
+    df_long["pref_at"] = pd.to_datetime(
+        df_long["date"].astype(str) + " " + df_long["slot"].map(TIME_COLS)
+    ).dt.tz_localize("Asia/Singapore")
+
+    df_pref_time = df_long[["id", "username", "pref_at"]]
+
     df_merged = df_records.merge(
         df_pref_time,
         left_on=["username", "lesson_at"],
