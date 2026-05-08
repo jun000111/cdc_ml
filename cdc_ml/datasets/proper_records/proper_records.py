@@ -10,12 +10,12 @@ from cdc_ml.config import (
     RAW_DATA_DIR,
     DATABASE_URL,
     INTERIM_DATA_DIR,
-    INTERIM_RECORDS_PARQUET,
-    RAW_RECORDS_CSV,
+    PROPER_RECORDS_INTERIM,
+    PROPER_RECORDS_RAW,
 )
-from cdc_ml.datasets.records.schema import CleanedRecords
+from cdc_ml.datasets.proper_records.schema import CleanedRecords
 
-from cdc_ml.datasets.records.constants import (
+from cdc_ml.datasets.proper_records.constants import (
     RECORDS_DATE_PATTERN1,
     RECORDS_DATE_PATTERN2,
     NAME_DIC,
@@ -162,20 +162,20 @@ def fetch_from_disk(raw_out_path: Path) -> None:
 
 
 @app.command()
-def fetch(raw_out_path: Path = RAW_RECORDS_CSV):
+def fetch(raw_out_path: Path = PROPER_RECORDS_RAW):
     fetch_from_disk(raw_out_path)
 
 
 @app.command()
 def clean(
-    raw_input_path: Path = RAW_RECORDS_CSV, interim_output_path: Path = INTERIM_RECORDS_PARQUET
+    raw_input_path: Path = PROPER_RECORDS_RAW, interim_output_path: Path = PROPER_RECORDS_INTERIM
 ):
     clean_from_disk(raw_input_path, interim_output_path)
 
 
 @app.command()
 def run(
-    raw_input_path: Path = RAW_RECORDS_CSV, interim_output_path: Path = INTERIM_RECORDS_PARQUET
+    raw_input_path: Path = PROPER_RECORDS_RAW, interim_output_path: Path = PROPER_RECORDS_INTERIM
 ):
     fetch_from_disk(raw_input_path)
     clean_from_disk(raw_input_path, interim_output_path)

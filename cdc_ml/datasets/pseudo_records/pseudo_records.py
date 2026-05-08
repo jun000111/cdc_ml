@@ -5,11 +5,11 @@ import typer
 from loguru import logger
 
 from cdc_ml.config import (
-    EXTERNAL_PSEUDO_EXCEL,
-    INTERIM_PSEUDO_PARQUET,
+    PSEUDO_BOOKINGS_EXTERNAL,
+    PSEUDO_BOOKINGS_INTERIM,
 )
 from cdc_ml.datasets.constants import TIMESLOTS, TIMEZONE
-from cdc_ml.datasets.pseudo.schema import CleanedPseudo
+from cdc_ml.datasets.pseudo_records.schema import CleanedPseudo
 
 app = typer.Typer()
 
@@ -35,18 +35,29 @@ def clean_columns(df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def is_valid_lessons(df: pd.DataFrame) -> None:
+    lesson_times = df["lesson_at"].dt.strftime("%H:%M")
+    invalid_mask = df["lesson_at"].notna() & ~lesson_times.isin(TIMESLOTS)
+
+    if invalid_mask.any():
+        invalid = df[invalid_mask]
+        logger.error(f"{invalid_mask.sum()} invalid stamps")
+        logger.error(invalid[["username", "lesson_at"]])
+
+
 def clean_df(df: pd.DataFrame) -> pd.DataFrame:
     df = normalize_username(df)
 
     df["lesson_at"] = to_timestamp_at(df["lesson_date"], df["lesson_time"])
     df["booking_at"] = to_timestamp_at(df["booking date"], df["booking time"])
     df = clean_columns(df)
+    is_valid_lessons(df)
     return CleanedPseudo.validate(df, lazy=True)
 
 
 def clean_from_disk(
-    raw_input_path: Path = EXTERNAL_PSEUDO_EXCEL,
-    interim_output_path: Path = INTERIM_PSEUDO_PARQUET,
+    raw_input_path: Path = PSEUDO_BOOKINGS_EXTERNAL,
+    interim_output_path: Path = PSEUDO_BOOKINGS_INTERIM,
 ):
     df = pd.read_excel(raw_input_path)
     logger.info(f"Before cleaning : {len(df)} rows x {len(df.columns)}")
@@ -59,8 +70,8 @@ def clean_from_disk(
 
 @app.command()
 def run(
-    raw_input_path: Path = EXTERNAL_PSEUDO_EXCEL,
-    interim_output_path: Path = INTERIM_PSEUDO_PARQUET,
+    raw_input_path: Path = PSEUDO_BOOKINGS_EXTERNAL,
+    interim_output_path: Path = PSEUDO_BOOKINGS_INTERIM,
 ):
     clean_from_disk(raw_input_path, interim_output_path)
 

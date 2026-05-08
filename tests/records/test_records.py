@@ -2,7 +2,7 @@ import pytest
 import pandas as pd
 from pandas.testing import assert_series_equal
 
-from cdc_ml.datasets.records.records import (
+from cdc_ml.datasets.proper_records.proper_records import (
     flatten_name_dic,
     normalize_username,
     to_lesson_at,

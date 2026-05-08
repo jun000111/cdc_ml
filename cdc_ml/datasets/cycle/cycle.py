@@ -5,8 +5,8 @@ import typer
 from loguru import logger
 
 from cdc_ml.config import (
-    EXTERNAL_CYCLE_EXCEL,
-    INTERIM_CYCLE_PARQUET,
+    BOOKING_CYCLES_EXTERNAL,
+    BOOKING_CYCLES_INTERIM,
 )
 from cdc_ml.datasets.constants import TIMEZONE
 from cdc_ml.datasets.cycle.schema import CleanedCycle
@@ -35,6 +35,7 @@ def convert_column_type(df: pd.DataFrame) -> pd.DataFrame:
     df["range"] = df["range"].astype(str)
 
     df["username"] = df["username"].str.lower()
+    df.insert(0, "id", range(len(df)))
     return df
 
 
@@ -64,8 +65,8 @@ def clean_df(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def clean_from_disk(
-    external_input_path: Path = EXTERNAL_CYCLE_EXCEL,
-    interim_output_path: Path = INTERIM_CYCLE_PARQUET,
+    external_input_path: Path = BOOKING_CYCLES_EXTERNAL,
+    interim_output_path: Path = BOOKING_CYCLES_INTERIM,
 ):
 
     logger.info("Starting...")
@@ -79,8 +80,8 @@ def clean_from_disk(
 
 @app.command()
 def run(
-    external_input_path: Path = EXTERNAL_CYCLE_EXCEL,
-    interim_output_path: Path = INTERIM_CYCLE_PARQUET,
+    external_input_path: Path = BOOKING_CYCLES_EXTERNAL,
+    interim_output_path: Path = BOOKING_CYCLES_INTERIM,
 ):
     clean_from_disk(external_input_path, interim_output_path)
 

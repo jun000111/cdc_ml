@@ -4,10 +4,10 @@ import typer
 import pandas as pd
 
 from cdc_ml.config import (
-    INTERIM_CYCLE_PARQUET,
-    INTERIM_COMPLETE_RECORDS_PARQUET,
-    PROCESSED_POLL_PARQUET,
-    INTERIM_CLASS_PARQUET,
+    BOOKING_CYCLES_INTERIM,
+    RECORDS_INTERIM,
+    POLLS_PROCESSED,
+    CUSTOMER_CLASS_INTERIM,
 )
 from cdc_ml.features.add_derived_features import add_effective_mins
 
@@ -105,10 +105,10 @@ def generate_df(
 
 
 def generate_on_disk(
-    interim_input_cycle_path: Path = INTERIM_CYCLE_PARQUET,
-    interim_input_complete_records_path: Path = INTERIM_COMPLETE_RECORDS_PARQUET,
-    interim_customer_class_path: Path = INTERIM_CLASS_PARQUET,
-    processed_output_path: Path = PROCESSED_POLL_PARQUET,
+    interim_input_cycle_path: Path = BOOKING_CYCLES_INTERIM,
+    interim_input_complete_records_path: Path = RECORDS_INTERIM,
+    interim_customer_class_path: Path = CUSTOMER_CLASS_INTERIM,
+    processed_output_path: Path = POLLS_PROCESSED,
 ):
 
     logger.info("Start...")
@@ -124,10 +124,10 @@ def generate_on_disk(
 
 @app.command()
 def run(
-    interim_input_cycle_path: Path = INTERIM_CYCLE_PARQUET,
-    interim_input_complete_records_path: Path = INTERIM_COMPLETE_RECORDS_PARQUET,
-    interim_customer_class_path: Path = INTERIM_CLASS_PARQUET,
-    processed_output_path: Path = PROCESSED_POLL_PARQUET,
+    interim_input_cycle_path: Path = BOOKING_CYCLES_INTERIM,
+    interim_input_complete_records_path: Path = RECORDS_INTERIM,
+    interim_customer_class_path: Path = CUSTOMER_CLASS_INTERIM,
+    processed_output_path: Path = POLLS_PROCESSED,
 ):
     generate_on_disk(
         interim_input_cycle_path,

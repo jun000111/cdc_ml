@@ -9,9 +9,9 @@ import typer
 
 from cdc_ml.config import (
     DATABASE_URL,
-    RAW_CLASS_CSV,
-    INTERIM_COMPLETE_RECORDS_PARQUET,
-    INTERIM_CLASS_PARQUET,
+    CUSTOMER_CLASS_RAW,
+    RECORDS_INTERIM,
+    CUSTOMER_CLASS_INTERIM,
 )
 from cdc_ml.datasets.customer_class.constants import (
     INVALID_CLASS,
@@ -31,16 +31,18 @@ def flatten_dic(dic: dict[str, list[str]]):
     return flattened
 
 
-def filter_and_keep(df_class: pd.DataFrame, df_records: pd.DataFrame) -> pd.DataFrame:
-    """only keep main customers and valid class like 3 and 3a"""
-    keep_main_customers = df_class["username"].isin(df_records["username"])
+def filter_and_keep(df_class: pd.DataFrame) -> pd.DataFrame:
+    """only keep valid class like 3 and 3a"""
+    # keep_main_customers = df_class["username"].isin(df_records["username"])
     keep_valid_class = ~df_class["class_type"].isin(INVALID_CLASS)
-    return df_class.loc[keep_main_customers & keep_valid_class]
+    # return df_class.loc[keep_main_customers & keep_valid_class]
+    return df_class.loc[keep_valid_class]
 
 
-def clean(df_class: pd.DataFrame) -> pd.DataFrame:
+def normalize_columns(df_class: pd.DataFrame) -> pd.DataFrame:
     df_class = df_class.rename(columns={"nickname": "username", "course_type": "class_type"})
     df_class["username"] = df_class["username"].str.lower()
+    df_class = df_class.drop_duplicates(["username"])
     return df_class
 
 
@@ -66,30 +68,21 @@ def modify_class_type(df_class: pd.DataFrame) -> pd.DataFrame:
     return assigned_one_team
 
 
-def all_user_included(df_class: pd.DataFrame, df_records: pd.DataFrame) -> None:
-    missing_list = df_records.loc[~df_records["username"].isin(df_class["username"]), "username"]
-    if not missing_list.empty:
-        missing = missing_list.unique().tolist()
-        raise ValueError(f"Username not assigned with a class :{missing}")
+def clean_df(df_class: pd.DataFrame):
 
+    df_class = normalize_columns(df_class)
 
-def generate_class_df(df_class: pd.DataFrame, df_records: pd.DataFrame):
-
-    df_class = clean(df_class)
-
-    df_cleaned = filter_and_keep(df_class, df_records)
+    df_cleaned = filter_and_keep(df_class)
 
     df_cleaned = add_non_standard_records(df_cleaned)
 
     df_cleaned = modify_class_type(df_cleaned)
 
-    all_user_included(df_cleaned, df_records)
-
     return CleanedClass.validate(df_cleaned)
 
 
 def fetch_from_disk(
-    raw_output_path: Path = RAW_CLASS_CSV,
+    raw_output_path: Path = CUSTOMER_CLASS_RAW,
 ):
     logger.info("Fetching data from Neon...")
     engine = create_engine(DATABASE_URL)
@@ -99,15 +92,13 @@ def fetch_from_disk(
     logger.success(f"Saved to {raw_output_path} ")
 
 
-def generate_from_disk(
-    raw_input_path: Path = RAW_CLASS_CSV,
-    interim_output_path: Path = INTERIM_CLASS_PARQUET,
-    interim_input_path: Path = INTERIM_COMPLETE_RECORDS_PARQUET,
+def clean_from_disk(
+    raw_input_path: Path = CUSTOMER_CLASS_RAW,
+    interim_output_path: Path = CUSTOMER_CLASS_INTERIM,
 ):
 
     df_class = pd.read_csv(raw_input_path)
-    df_records = pd.read_parquet(interim_input_path)
-    df = generate_class_df(df_class, df_records)
+    df = clean_df(df_class)
 
     logger.info(f"Total: {len(df)} rows x {len(df.columns)}")
     interim_output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -116,33 +107,30 @@ def generate_from_disk(
 
 
 @app.command()
-def generate(
-    raw_input_path: Path = RAW_CLASS_CSV,
-    interim_output_path: Path = INTERIM_CLASS_PARQUET,
-    interim_input_path: Path = INTERIM_COMPLETE_RECORDS_PARQUET,
+def clean(
+    raw_input_path: Path = CUSTOMER_CLASS_RAW,
+    interim_output_path: Path = CUSTOMER_CLASS_INTERIM,
 ):
-    generate_from_disk(raw_input_path, interim_output_path, interim_input_path)
+    clean_from_disk(raw_input_path, interim_output_path)
 
 
 @app.command()
 def fetch(
-    raw_output_path: Path = RAW_CLASS_CSV,
+    raw_output_path: Path = CUSTOMER_CLASS_RAW,
 ):
     fetch_from_disk(raw_output_path)
 
 
 @app.command()
 def run(
-    raw_output_path: Path = RAW_CLASS_CSV,
-    raw_input_path: Path = RAW_CLASS_CSV,
-    interim_output_path: Path = INTERIM_CLASS_PARQUET,
-    interim_input_path: Path = INTERIM_COMPLETE_RECORDS_PARQUET,
+    raw_output_path: Path = CUSTOMER_CLASS_RAW,
+    raw_input_path: Path = CUSTOMER_CLASS_RAW,
+    interim_output_path: Path = CUSTOMER_CLASS_INTERIM,
 ):
     fetch_from_disk(raw_output_path)
-    generate_from_disk(
+    clean_from_disk(
         raw_input_path,
         interim_output_path,
-        interim_input_path,
     )
 
 

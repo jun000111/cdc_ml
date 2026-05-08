@@ -25,23 +25,21 @@ FIGURES_DIR = REPORTS_DIR / "figures"
 DATABASE_URL = os.environ["DATABASE_URL"]
 SALT = os.environ["SALT"]
 
-RAW_RECORDS_CSV = RAW_DATA_DIR / "records.csv"
-INTERIM_RECORDS_PARQUET = INTERIM_DATA_DIR / "records.parquet"
+PROPER_RECORDS_RAW = RAW_DATA_DIR / "proper_records.csv"
+PROPER_RECORDS_INTERIM = INTERIM_DATA_DIR / "proper_records.parquet"
 
-EXTERNAL_PSEUDO_EXCEL = EXTERNAL_DATA_DIR / "pseudo_bookings.xlsx"
-INTERIM_PSEUDO_PARQUET = INTERIM_DATA_DIR / "pseudo.parquet"
+PSEUDO_BOOKINGS_EXTERNAL = EXTERNAL_DATA_DIR / "pseudo_records.xlsx"
+PSEUDO_BOOKINGS_INTERIM = INTERIM_DATA_DIR / "pseudo_records.parquet"
 
-INTERIM_COMPLETE_RECORDS_PARQUET = INTERIM_DATA_DIR / "complete_records.parquet"
+BOOKING_CYCLES_EXTERNAL = EXTERNAL_DATA_DIR / "booking_cycles.xlsx"
+BOOKING_CYCLES_INTERIM = INTERIM_DATA_DIR / "booking_cycles.parquet"
 
-EXTERNAL_CYCLE_EXCEL = EXTERNAL_DATA_DIR / "booking_cycle.xlsx"
-INTERIM_CYCLE_PARQUET = INTERIM_DATA_DIR / "cycle.parquet"
+CUSTOMER_CLASS_RAW = RAW_DATA_DIR / "customer_class.csv"
+CUSTOMER_CLASS_INTERIM = INTERIM_DATA_DIR / "customer_class.parquet"
 
-RAW_CLASS_CSV = RAW_DATA_DIR / "customer_class.csv"
-INTERIM_CLASS_PARQUET = INTERIM_DATA_DIR / "customer_class.parquet"
+RECORDS_INTERIM = PROCESSED_DATA_DIR / "records.parquet"
+POLLS_PROCESSED = PROCESSED_DATA_DIR / "polls.parquet"
 
-PROCESSED_CLASS_RECORDS_PARQUET = PROCESSED_DATA_DIR / "class_records.parquet"
-
-PROCESSED_POLL_PARQUET = PROCESSED_DATA_DIR / "polls.parquet"
 # If tqdm is installed, configure loguru with tqdm.write
 # https://github.com/Delgan/loguru/issues/135
 try:
