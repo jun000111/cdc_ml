@@ -1,5 +1,5 @@
 import pandas as pd
-from cdc_ml.config import RAW_DATA_DIR, BOOKING_CYCLES_INTERIM
+from cdc_ml.config import RAW_DATA_DIR, BOOKING_CYCLES_PROCESSED
 
 res = []
 max_availability = (0, 1, 2, 3, 4, 5, 6)
@@ -3675,7 +3675,7 @@ def fmt(xs):
     return ",".join(map(str, xs))
 
 
-df = pd.read_parquet(BOOKING_CYCLES_INTERIM)
+df = pd.read_parquet(BOOKING_CYCLES_PROCESSED)
 rows = []
 for p in PREF_LIST:
     interval = "D"

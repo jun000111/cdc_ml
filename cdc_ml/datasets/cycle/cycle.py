@@ -6,7 +6,7 @@ from loguru import logger
 
 from cdc_ml.config import (
     BOOKING_CYCLES_EXTERNAL,
-    BOOKING_CYCLES_INTERIM,
+    BOOKING_CYCLES_PROCESSED,
 )
 from cdc_ml.datasets.constants import TIMEZONE
 from cdc_ml.datasets.cycle.schema import CleanedCycle
@@ -66,7 +66,7 @@ def clean_df(df: pd.DataFrame) -> pd.DataFrame:
 
 def clean_from_disk(
     external_input_path: Path = BOOKING_CYCLES_EXTERNAL,
-    interim_output_path: Path = BOOKING_CYCLES_INTERIM,
+    interim_output_path: Path = BOOKING_CYCLES_PROCESSED,
 ):
 
     logger.info("Starting...")
@@ -81,7 +81,7 @@ def clean_from_disk(
 @app.command()
 def run(
     external_input_path: Path = BOOKING_CYCLES_EXTERNAL,
-    interim_output_path: Path = BOOKING_CYCLES_INTERIM,
+    interim_output_path: Path = BOOKING_CYCLES_PROCESSED,
 ):
     clean_from_disk(external_input_path, interim_output_path)
 

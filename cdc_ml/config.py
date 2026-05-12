@@ -32,10 +32,10 @@ PSEUDO_BOOKINGS_EXTERNAL = EXTERNAL_DATA_DIR / "pseudo_records.xlsx"
 PSEUDO_BOOKINGS_INTERIM = INTERIM_DATA_DIR / "pseudo_records.parquet"
 
 BOOKING_CYCLES_EXTERNAL = EXTERNAL_DATA_DIR / "booking_cycles.xlsx"
-BOOKING_CYCLES_INTERIM = INTERIM_DATA_DIR / "booking_cycles.parquet"
+BOOKING_CYCLES_PROCESSED = PROCESSED_DATA_DIR / "booking_cycles.parquet"
 
 CUSTOMER_CLASS_RAW = RAW_DATA_DIR / "customer_class.csv"
-CUSTOMER_CLASS_INTERIM = INTERIM_DATA_DIR / "customer_class.parquet"
+CUSTOMER_CLASS_PROCESSED = PROCESSED_DATA_DIR / "customer_class.parquet"
 
 PREFERENCE_EXTERNAL = EXTERNAL_DATA_DIR / "preference.xlsx"
 PREFERENCE_PROCESSED = PROCESSED_DATA_DIR / "preference.parquet"
