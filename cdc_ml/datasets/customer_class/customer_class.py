@@ -10,8 +10,7 @@ import typer
 from cdc_ml.config import (
     DATABASE_URL,
     CUSTOMER_CLASS_RAW,
-    RECORDS_PROCESSED,
-    CUSTOMER_CLASS_INTERIM,
+    CUSTOMER_CLASS_PROCESSED,
 )
 from cdc_ml.datasets.customer_class.constants import (
     INVALID_CLASS,
@@ -94,7 +93,7 @@ def fetch_from_disk(
 
 def clean_from_disk(
     raw_input_path: Path = CUSTOMER_CLASS_RAW,
-    interim_output_path: Path = CUSTOMER_CLASS_INTERIM,
+    interim_output_path: Path = CUSTOMER_CLASS_PROCESSED,
 ):
 
     df_class = pd.read_csv(raw_input_path)
@@ -109,7 +108,7 @@ def clean_from_disk(
 @app.command()
 def clean(
     raw_input_path: Path = CUSTOMER_CLASS_RAW,
-    interim_output_path: Path = CUSTOMER_CLASS_INTERIM,
+    interim_output_path: Path = CUSTOMER_CLASS_PROCESSED,
 ):
     clean_from_disk(raw_input_path, interim_output_path)
 
@@ -125,7 +124,7 @@ def fetch(
 def run(
     raw_output_path: Path = CUSTOMER_CLASS_RAW,
     raw_input_path: Path = CUSTOMER_CLASS_RAW,
-    interim_output_path: Path = CUSTOMER_CLASS_INTERIM,
+    interim_output_path: Path = CUSTOMER_CLASS_PROCESSED,
 ):
     fetch_from_disk(raw_output_path)
     clean_from_disk(

@@ -43,6 +43,8 @@ PREFERENCE_PROCESSED = PROCESSED_DATA_DIR / "preference.parquet"
 RECORDS_PROCESSED = PROCESSED_DATA_DIR / "records.parquet"
 POLLS_PROCESSED = PROCESSED_DATA_DIR / "polls.parquet"
 
+STAGE_1_PROCESSED = PROCESSED_DATA_DIR / "stage_1.parquet"
+
 # If tqdm is installed, configure loguru with tqdm.write
 # https://github.com/Delgan/loguru/issues/135
 try:

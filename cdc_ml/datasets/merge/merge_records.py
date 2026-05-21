@@ -8,7 +8,7 @@ from cdc_ml.config import (
     RECORDS_PROCESSED,
     PROPER_RECORDS_INTERIM,
     PSEUDO_BOOKINGS_INTERIM,
-    CUSTOMER_CLASS_INTERIM,
+    CUSTOMER_CLASS_PROCESSED,
 )
 from cdc_ml.datasets.merge.schema import MergeRecordsPseudo
 
@@ -49,7 +49,7 @@ def merge_on_disk(
     interim_output_path: Path = RECORDS_PROCESSED,
     records_input_path: Path = PROPER_RECORDS_INTERIM,
     pseudo_input_path: Path = PSEUDO_BOOKINGS_INTERIM,
-    class_input_path: Path = CUSTOMER_CLASS_INTERIM,
+    class_input_path: Path = CUSTOMER_CLASS_PROCESSED,
 ) -> None:
 
     logger.info(f"Merging proper and pseudo records...")
@@ -68,7 +68,7 @@ def merge(
     interim_output_path: Path = RECORDS_PROCESSED,
     records_input_path: Path = PROPER_RECORDS_INTERIM,
     pseudo_input_path: Path = PSEUDO_BOOKINGS_INTERIM,
-    class_input_path: Path = CUSTOMER_CLASS_INTERIM,
+    class_input_path: Path = CUSTOMER_CLASS_PROCESSED,
 ):
     merge_on_disk(interim_output_path, records_input_path, pseudo_input_path, class_input_path)
 

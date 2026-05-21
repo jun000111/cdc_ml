@@ -8,7 +8,6 @@ from cdc_ml.config import (
     RECORDS_PROCESSED,
     POLLS_PROCESSED,
 )
-from cdc_ml.features.add_derived_features import add_effective_mins
 
 app = typer.Typer()
 
@@ -34,13 +33,6 @@ def build_poll_df(
     return pd.DataFrame(rows)
 
 
-# def assign_class_type(df_records: pd.DataFrame, df_class: pd.DataFrame):
-#     """left join the records with the class type"""
-#     df_customer_records = df_records.merge(df_class, on="username", how="left")
-#     df_customer_records["is_one_team"] = df_customer_records["is_one_team"].fillna(0).astype(int)
-#     return df_customer_records
-
-
 def validate_booking_records(df_poll: pd.DataFrame, df_records: pd.DataFrame):
 
     cycles = df_poll[["username", "cycle_start", "cycle_end"]].drop_duplicates()
@@ -52,8 +44,6 @@ def validate_booking_records(df_poll: pd.DataFrame, df_records: pd.DataFrame):
         & (merged["booking_at"] <= merged["cycle_end"])
     ]
     invalid_records = df_records[~(df_records["id"].isin(valid["id"]))]
-    print(invalid_records)
-    print(merged.loc[merged["id"] == 340])
     if not invalid_records.empty:
         logger.error(f"{len(invalid_records)} in records")
         raise ValueError(
@@ -65,47 +55,37 @@ def validate_booking_records(df_poll: pd.DataFrame, df_records: pd.DataFrame):
 
 def add_lable(df_poll: pd.DataFrame, df_records: pd.DataFrame) -> pd.DataFrame:
 
-    booking_keys = pd.MultiIndex.from_arrays(
-        [
-            df_records["username"],
-            df_records["booking_at"].dt.floor("h"),
-        ]
+    df_records = df_records.assign(
+        booking_hour=df_records["booking_at"].dt.floor("h"), has_booking=1
     )
-
-    polling_keys = pd.MultiIndex.from_arrays(
-        [
-            df_poll["username"],
-            df_poll["polling_at"].dt.floor("h"),
-        ]
+    df_poll["polling_at"] = df_poll["polling_at"].dt.floor("h")
+    df_poll = df_poll.merge(
+        df_records[["username", "booking_hour", "has_booking"]],
+        left_on=["username", "polling_at"],
+        right_on=["username", "booking_hour"],
+        how="outer",
     )
+    df_poll["has_booking"] = df_poll["has_booking"].fillna(0).astype(bool)
 
-    df_poll = df_poll.assign(has_booking=polling_keys.isin(booking_keys).astype(int))
+    # df_poll = df_poll.assign(has_booking=polling_keys.isin(booking_keys).astype(int))
     df_poll = df_poll.assign(
+        cycle_start_month=lambda row: row["cycle_start"].dt.month,
+        cycle_start_day=lambda row: row["cycle_start"].dt.day,
         cycle_start_dow=lambda row: row["cycle_start"].dt.day_of_week,
         cycle_start_hour=lambda row: row["cycle_start"].dt.hour,
     )
     df_poll = df_poll.assign(
+        polling_month=lambda row: row["polling_at"].dt.month,
+        polling_day=lambda row: row["polling_at"].dt.day,
         polling_dow=lambda row: row["polling_at"].dt.day_of_week,
         polling_hour=lambda row: row["polling_at"].dt.hour,
     )
 
-    df_poll.insert(0, "id", range(len(df_poll)))
-    print(df_poll)
+    df_poll = df_poll.assign(
+        hours_into_cycle=(df_poll["polling_at"] - df_poll["cycle_start"]).dt.total_seconds() / 3600
+    )
 
-    df_poll = df_poll[
-        [
-            "id",
-            "username",
-            "cycle_start",
-            "cycle_start_dow",
-            "cycle_start_hour",
-            "cycle_end",
-            "polling_at",
-            "polling_dow",
-            "polling_hour",
-            "has_booking",
-        ]
-    ]
+    df_poll.insert(0, "id", range(len(df_poll)))
 
     return df_poll
 
