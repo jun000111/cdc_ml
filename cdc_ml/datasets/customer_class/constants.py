@@ -9,6 +9,7 @@ CUSTOMER_CLASS_DIC = {
     "fir": "03. Class 3A Motorcar",
     "afellow": "03. Class 3A Motorcar",
     "isyaf": "03. Class 3A Motorcar",
+    "jun": "03. Class 3A Motorcar",
     "max": "04. Class 3A Motorcar (One Team)",
 }
 
