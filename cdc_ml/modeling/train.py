@@ -8,6 +8,7 @@ import numpy as np
 import xgboost as xgb
 from sklearn.metrics import brier_score_loss, average_precision_score
 from sklearn.model_selection import StratifiedGroupKFold
+from sklearn.inspection import permutation_importance
 
 from cdc_ml.config import MODELS_DIR, PROCESSED_DATA_DIR, STAGE_1_PROCESSED
 from cdc_ml.features.build_features import drop_meta_high_card_cols
@@ -159,15 +160,19 @@ def train(df: pd.DataFrame, extra: list, seed=42):
             min_child_weight=10,
             subsample=0.8,
             colsample_bytree=0.8,
-            reg_lambda=20.0,
+            reg_lambda=10.0,
             tree_method="hist",
             random_state=seed,
             n_jobs=-1,
         )
         model.fit(X_tr, y_tr, eval_set=[(X_va, y_va)], verbose=False)
+        models.append(model)
+
+        r = permutation_importance(model, X_va, y_va, n_repeats=10, random_state=seed, n_jobs=-1)
+        print(r.importances_mean)
+
         oof_xgb[va] = model.predict_proba(X_va)[:, 1]
         tr_pred = model.predict_proba(X_tr)[:, 1]
-        models.append(model)
         # --- marg baseline (dow × hour lookup) ---
         p_lut = joint_lut_hier(X_tr, y_tr, X_va)
         oof_joint[va] = p_lut
@@ -267,7 +272,7 @@ def train(df: pd.DataFrame, extra: list, seed=42):
         f"xgb_tr  brier=  ---   ({np.mean(tr_brier_list):.4f}±{np.std(tr_brier_list):.4f})   "
         f"pr_auc=  ---   ({np.mean(tr_pr_list):.4f}±{np.std(tr_pr_list):.4f})\n"
     )
-    return oof_xgb, oof_joint, oof_const
+    return oof_xgb, oof_joint, oof_const,models
 
 
 def train_on_disk(data: Path, models: Path):
