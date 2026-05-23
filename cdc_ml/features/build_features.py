@@ -21,7 +21,9 @@ def assign_class_type(df_poll: pd.DataFrame, df_class: pd.DataFrame):
 
 
 def drop_meta_high_card_cols(df: pd.DataFrame) -> pd.DataFrame:
-    return df.drop(columns=["id", "username", "cycle_start", "cycle_end", "polling_at"])
+    return df.drop(
+        columns=["id", "username", "cycle_start", "cycle_end", "polling_at", "booking_hour"]
+    )
 
 
 def build_features(
