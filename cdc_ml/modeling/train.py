@@ -42,7 +42,7 @@ def baseline_const(X_tr, y_tr):
     return X_tr.assign(_y=y_tr)["_y"].mean()
 
 
-def joint_lut_hier(X_tr, y_tr, X_va, alpha_marg=20.0, alpha_cell=30.0):
+def joint_lut_hier(X_tr, y_tr, X_va, alpha_marg=20.0, alpha_cell=10.0):
     df = X_tr.assign(_y=y_tr)
     base = df["_y"].mean()
     z0 = np.log(base / (1 - base))
@@ -145,7 +145,8 @@ def train(df: pd.DataFrame, extra: list, seed=42):
     whales_pt_mask = df["username"].isin(["anmol", "jy", "mya"]).to_numpy()
     whales_pc_mask = df["username"].isin(["kim", "jy", "flower"]).to_numpy()
     sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=120)
-
+    importances = []
+    importances_std = []
     for fold, (tr, va) in enumerate(sgkf.split(X, y=df["has_booking"], groups=df["username"])):
         X_tr, y_tr = X.iloc[tr], y[tr]
         X_va, y_va = X.iloc[va], y[va]
@@ -168,7 +169,12 @@ def train(df: pd.DataFrame, extra: list, seed=42):
         model.fit(X_tr, y_tr, eval_set=[(X_va, y_va)], verbose=False)
         models.append(model)
 
-        r = permutation_importance(model, X_va, y_va, n_repeats=10, random_state=seed, n_jobs=-1)
+        r = permutation_importance(model, X_va, y_va, n_repeats=10, random_state=seed, n_jobs=-1,scoring="average_precision")
+
+        importances.append(r.importances_mean)
+        importances_std.append(r.importances_std)
+
+        print(X.columns.tolist())
         print(r.importances_mean)
 
         oof_xgb[va] = model.predict_proba(X_va)[:, 1]
@@ -252,6 +258,12 @@ def train(df: pd.DataFrame, extra: list, seed=42):
     non_whales_brier_xgb = brier_score_loss(y[~whales_pc_mask], oof_xgb[~whales_pc_mask])
     non_whales_pr_xgb = average_precision_score(y[~whales_pt_mask], oof_xgb[~whales_pt_mask])
 
+    mean_importance = np.mean(importances, axis=0)
+    mean_std = np.mean(importances_std,axis=0)
+
+    avg_df = pd.DataFrame({"feature": X.columns, "mean": mean_importance, "std": mean_std}).sort_values("mean", ascending=False)
+    
+
     print(
         f"\nOOF  base_rate={y.mean():.4f}  n={len(y)}/{n}      "
         f"format: pooled (mean±std over folds)\n"
@@ -271,6 +283,7 @@ def train(df: pd.DataFrame, extra: list, seed=42):
         f"          non whales pr={non_whales_pr_xgb} lift={non_whales_pr_xgb/non_whale_pc_base}\n"
         f"xgb_tr  brier=  ---   ({np.mean(tr_brier_list):.4f}±{np.std(tr_brier_list):.4f})   "
         f"pr_auc=  ---   ({np.mean(tr_pr_list):.4f}±{np.std(tr_pr_list):.4f})\n"
+        f"Average importances \n{avg_df}"
     )
     return oof_xgb, oof_joint, oof_const,models
 
