@@ -1,0 +1,7 @@
+only keep polling hour and dow, adding the rest will cause overfit , especailly hours into cycle
+hours into cycle should be dropped anyways since cycle start hour is contaminated
+polling hour and dow additive and joint performs the same , they have the same underlying curves in interaction plot
+
+decide if going to do oversample
+draft top k 
+draft calibration graph
