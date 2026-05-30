@@ -169,7 +169,15 @@ def train(df: pd.DataFrame, extra: list, seed=42):
         model.fit(X_tr, y_tr, eval_set=[(X_va, y_va)], verbose=False)
         models.append(model)
 
-        r = permutation_importance(model, X_va, y_va, n_repeats=10, random_state=seed, n_jobs=-1,scoring="average_precision")
+        r = permutation_importance(
+            model,
+            X_va,
+            y_va,
+            n_repeats=10,
+            random_state=seed,
+            n_jobs=-1,
+            scoring="average_precision",
+        )
 
         importances.append(r.importances_mean)
         importances_std.append(r.importances_std)
@@ -259,10 +267,11 @@ def train(df: pd.DataFrame, extra: list, seed=42):
     non_whales_pr_xgb = average_precision_score(y[~whales_pt_mask], oof_xgb[~whales_pt_mask])
 
     mean_importance = np.mean(importances, axis=0)
-    mean_std = np.mean(importances_std,axis=0)
+    mean_std = np.mean(importances_std, axis=0)
 
-    avg_df = pd.DataFrame({"feature": X.columns, "mean": mean_importance, "std": mean_std}).sort_values("mean", ascending=False)
-    
+    avg_df = pd.DataFrame(
+        {"feature": X.columns, "mean": mean_importance, "std": mean_std}
+    ).sort_values("mean", ascending=False)
 
     print(
         f"\nOOF  base_rate={y.mean():.4f}  n={len(y)}/{n}      "
@@ -285,7 +294,7 @@ def train(df: pd.DataFrame, extra: list, seed=42):
         f"pr_auc=  ---   ({np.mean(tr_pr_list):.4f}±{np.std(tr_pr_list):.4f})\n"
         f"Average importances \n{avg_df}"
     )
-    return oof_xgb, oof_joint, oof_const,models
+    return oof_xgb, oof_joint, oof_const, oof_add, models, whales_pc_mask
 
 
 def train_on_disk(data: Path, models: Path):
