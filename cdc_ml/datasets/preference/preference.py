@@ -7,7 +7,7 @@ from typing import cast
 
 from cdc_ml.config import RECORDS_PROCESSED, PREFERENCE_EXTERNAL, PREFERENCE_PROCESSED
 from cdc_ml.datasets.constants import TIMESLOTS, TIMEZONE
-from cdc_ml.datasets.pseudo_records.schema import CleanedPseudo
+from cdc_ml.datasets.preference.schema import CleanedPreference
 
 app = typer.Typer()
 
@@ -24,8 +24,8 @@ def generate_rows(
     standard_timelist=TIMESLOTS,
 ):
     rows = []
-    pref_start = pd.Timestamp(pref_s)
-    pref_end = pd.Timestamp(pref_e)
+    pref_start = pd.Timestamp(pref_s).tz_localize(TIMEZONE)
+    pref_end = pd.Timestamp(pref_e).tz_localize(TIMEZONE)
     date_range = pd.date_range(pref_start, pref_end, freq=interval)
 
     # {0:"08:30",1:"10:20",2:"12:45",...}
@@ -48,7 +48,6 @@ def generate_rows(
                 "id": id,
                 "username": username,
                 "day_of_week": date.day_of_week,
-                "day_name": date.day_name(),
                 "pref_start": pref_start,
                 "pref_end": pref_end,
                 "date": date,
@@ -86,7 +85,7 @@ def all_records_valid(df_pref: pd.DataFrame, df_records: pd.DataFrame) -> None:
     # Build all pref_at timestamps in a single vectorized call
     df_long["pref_at"] = pd.to_datetime(
         df_long["date"].astype(str) + " " + df_long["slot"].map(TIME_COLS)
-    ).dt.tz_localize("Asia/Singapore")
+    )
 
     df_pref_time = df_long[["id", "username", "pref_at"]]
 
@@ -111,6 +110,7 @@ def all_records_valid(df_pref: pd.DataFrame, df_records: pd.DataFrame) -> None:
 
 def build_pref(df: pd.DataFrame) -> pd.DataFrame:
     parsed = df[list(DAY_COLS)].astype(str).map(get_int_array)
+    print(parsed)
 
     new_rows = []
     for meta, rules_t in zip(
@@ -140,7 +140,9 @@ def build_pref(df: pd.DataFrame) -> pd.DataFrame:
             "20:40": "t_2040",
         }
     )
-    return df
+    df = pd.concat([df, parsed], axis=1)
+
+    return CleanedPreference.validate(df)
 
 
 def clean_df(df_pref: pd.DataFrame, df_records: pd.DataFrame) -> pd.DataFrame:

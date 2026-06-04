@@ -40,7 +40,7 @@ def platt_recal(oof, df):
     z = np.log(oof / (1 - oof)).reshape(-1, 1)  # logits of pooled OOF probs
     platt = LogisticRegression().fit(z, df["has_booking"])  # learn slope + offset
     p_cal = platt.predict_proba(z)[:, 1]  # corrected probabilities
-    return p_cal
+    return p_cal, platt
 
 
 def reliability_table(p_pred, y_true, n_bins=10):
