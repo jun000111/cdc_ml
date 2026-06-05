@@ -3,67 +3,8 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from matplotlib.ticker import PercentFormatter
 from sklearn.linear_model import LogisticRegression
-
-
-def wilson_interval(k, n, z=1.96):
-    """95% Wilson score interval for a binomial proportion.
-
-    Returns (p_hat, lower, upper). p_hat is the raw observed frequency (the
-    plotted point); the interval is the Wilson score interval, which stays
-    sensible when k is tiny or n is small.
-    """
-    k = np.asarray(k, dtype=float)
-    n = np.asarray(n, dtype=float)
-    p = np.divide(k, n, out=np.zeros_like(k, dtype=float), where=n > 0)
-    denom = 1.0 + z**2 / n
-    center = (p + z**2 / (2 * n)) / denom
-    half = (z / denom) * np.sqrt(p * (1 - p) / n + z**2 / (4 * n**2))
-    lower = np.clip(center - half, 0.0, 1.0)
-    upper = np.clip(center + half, 0.0, 1.0)
-    return p, lower, upper
-
-
-def _quantile_bin_index(p_pred, n_bins):
-    """Assign each prediction to a quantile bin. Dedups edges, so the effective
-    number of bins may be < n_bins when predictions are discrete (LUT) or
-    heavily point-massed. Returns (edges, idx, n_effective)."""
-    edges = np.quantile(p_pred, np.linspace(0.0, 1.0, n_bins + 1))
-    edges = np.unique(edges)
-    if len(edges) < 2:  # all predictions identical
-        return edges, np.zeros(len(p_pred), dtype=int), 1
-    idx = np.clip(np.digitize(p_pred, edges[1:-1], right=False), 0, len(edges) - 2)
-    return edges, idx, len(edges) - 1
-
-
-def platt_recal(oof, df):
-
-    z = np.log(oof / (1 - oof)).reshape(-1, 1)  # logits of pooled OOF probs
-    platt = LogisticRegression().fit(z, df["has_booking"])  # learn slope + offset
-    p_cal = platt.predict_proba(z)[:, 1]  # corrected probabilities
-    return p_cal, platt
-
-
-def reliability_table(p_pred, y_true, n_bins=10):
-    """Per-bin mean predicted prob, observed freq, Wilson CI, and count."""
-    p_pred = np.asarray(p_pred, dtype=float)
-    y_true = np.asarray(y_true, dtype=float)
-    _, idx, n_eff = _quantile_bin_index(p_pred, n_bins)
-
-    x, k_arr, n_arr = [], [], []
-    for b in range(n_eff):
-        mask = idx == b
-        n = int(mask.sum())
-        if n == 0:
-            continue
-        x.append(p_pred[mask].mean())
-        k_arr.append(y_true[mask].sum())
-        n_arr.append(n)
-
-    x = np.array(x)
-    k_arr = np.array(k_arr)
-    n_arr = np.array(n_arr)
-    obs, lo, hi = wilson_interval(k_arr, n_arr)
-    return {"x": x, "obs": obs, "lo": lo, "hi": hi, "n": n_arr, "k": k_arr}
+from cdc_ml.modeling.calibrate import *
+from cdc_ml.modeling.evaluation import gains_bootstrap
 
 
 def plot_calibration_by_volume(
@@ -154,3 +95,39 @@ def plot_calibration_by_volume(
 
     fig.align_ylabels([ax, axh])
     return fig
+
+
+def bootstrapped_gain_curve(df: pd.DataFrame, pred):
+
+    # if your calibrated OOF preds are an array: df_train = df_train.assign(p_oof_cal=p_oof_cal)
+    df_train = df.assign(p_oof_cal=pred)
+    res = gains_bootstrap(df_train, pred_col="p_oof_cal")
+    g, lo, med, hi = res["grid"] * 100, res["lo"] * 100, res["med"] * 100, res["hi"] * 100
+    b_lo, b_med, b_hi = res["budget_ci"] * 100
+
+    fig, ax = plt.subplots(figsize=(9, 9))
+    ax.plot([0, 100], [0, 100], "--", color="0.6", lw=1, label="random")
+    ax.fill_between(g, lo, hi, color="#2f6db0", alpha=0.18, label="95% CI (user bootstrap)")
+    ax.plot(g, med, color="#2f6db0", lw=2.2, label="median gains curve")
+    ax.errorbar(
+        b_med,
+        90,
+        xerr=[[b_med - b_lo], [b_hi - b_med]],
+        fmt="o",
+        color="#c0392b",
+        capsize=4,
+        zorder=6,
+        label=f"90% recall @ {b_med:.0f}% polls  [{b_lo:.0f}-{b_hi:.0f}%]",
+    )
+    ax.axhline(90, color="#c0392b", ls=":", lw=0.8)
+    ax.set_xlim(0, 100)
+    ax.set_ylim(0, 100)
+    ax.set_aspect("equal")
+    ax.set_xlabel("% of polling volume kept (highest predicted P first)")
+    ax.set_ylabel("% of bookings captured")
+    ax.set_title("Per-poll budget vs bookings captured (user-bootstrapped)", fontweight="bold")
+    ax.legend(loc="lower right", frameon=False)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    fig.tight_layout()
+    return fig, res

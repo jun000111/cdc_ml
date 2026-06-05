@@ -1,0 +1,160 @@
+import pandas as pd
+import numpy as np
+from scipy import stats
+import numpy as np
+from sklearn.metrics import average_precision_score
+from sklearn.model_selection import cross_val_score
+from sklearn.ensemble import RandomForestClassifier
+
+
+def model_comparison(oof: dict):
+
+    model_metric = pd.DataFrame(
+        {
+            "model": oof.keys(),
+            "mean": [np.mean(v) for v in oof.values()],
+            "std": [np.std(v) for v in oof.values()],
+        }
+    )
+
+    return model_metric
+
+
+def paired_t(
+    model_metric: dict,
+    better: str,
+    worse: str,
+):
+    """returns d,t,p,ci,n_pos"""
+
+    diff = np.asarray(model_metric[better]) - np.asarray(
+        model_metric[worse]
+    )  # paired, row-wise by iteration
+    print(len(diff))
+    d_bar = diff.mean()  # = +0.0019, your point estimate
+    t, p = stats.ttest_rel(model_metric[better], model_metric[worse])  # two-sided
+    ci = stats.t.interval(
+        0.95, len(diff) - 1, loc=d_bar, scale=diff.std(ddof=1) / np.sqrt(len(diff))
+    )
+    n_pos = (diff > 0).sum()  # how many of 20 seeds favored dow
+
+    return d_bar, t, p, ci, n_pos
+
+
+def pr_auc_ci_by_user(y, score, user_ids, n_boot=1000, seed=0):
+    y, score, user_ids = map(np.asarray, (y, score, user_ids))
+    base, point = y.mean(), average_precision_score(y, score)
+    users = np.unique(user_ids)
+    rows_by_user = {u: np.where(user_ids == u)[0] for u in users}
+    rng, boots = np.random.default_rng(seed), []
+    for _ in range(n_boot):
+        idx = np.concatenate(
+            [rows_by_user[u] for u in rng.choice(users, len(users), replace=True)]
+        )
+        if y[idx].sum() == 0:
+            continue
+        boots.append(average_precision_score(y[idx], score[idx]))
+    lo, hi = np.percentile(boots, [2.5, 97.5])
+    print(f"users={len(users)} rows={len(y)} positives={int(y.sum())} base={base:.4f}")
+    print(
+        f"PR-AUC={point:.4f} ({point/base:.2f}x)  95% CI=[{lo:.4f}, {hi:.4f}] ([{lo/base:.2f}x, {hi/base:.2f}x])\n"
+    )
+
+
+def adversarial_validation(X_train, X_test):
+    X = pd.concat([X_train, X_test], ignore_index=True)
+    y = np.r_[np.zeros(len(X_train)), np.ones(len(X_test))]  # 0 = train, 1 = test
+    clf = RandomForestClassifier(n_estimators=300, random_state=0, n_jobs=-1)
+    auc = cross_val_score(clf, X, y, cv=5, scoring="roc_auc").mean()
+    print(f"adversarial AUC = {auc:.3f}   (0.5 = identical, ~0.65+ = real shift, 0.8+ = strong)")
+    clf.fit(X, y)
+    return clf
+
+
+def per_customer_at_budget(
+    df, pred_col, budget=0.30, user_col="username", label_col="has_booking"
+):
+    p = pred_col
+    keep = p >= np.quantile(p, 1 - budget)  # poll iff P >= tau (top `budget` of polls)
+    book = df[label_col].to_numpy(float)
+    t = (
+        df.assign(_caught=book * keep, _booking=book, _polled=keep.astype(float))
+        .groupby(user_col)
+        .agg(
+            bookings=("_booking", "sum"),
+            caught=("_caught", "sum"),
+            polls=("_booking", "size"),
+            polled=("_polled", "sum"),
+        )
+    )
+    t = t[t.bookings > 0]  # recall undefined without bookings
+    t["recall"] = t.caught / t.bookings
+    t["poll_kept"] = t.polled / t.polls
+    t = t.sort_values("bookings", ascending=False)
+    t["whale"] = t.bookings.cumsum().shift(fill_value=0) < 0.5 * t.bookings.sum()
+    return t
+
+
+def _gains_curve(p, y):
+    """Cumulative gains (x=frac polls, y=frac bookings), stepping at each distinct
+    prediction so a threshold includes whole tie-groups. Origin prepended.
+    Assumes one row = one poll (matches polls = size)."""
+    order = np.argsort(-p, kind="stable")
+    p, y = p[order], y[order]
+    cut = np.r_[True, p[1:] != p[:-1]]  # start of each distinct-P run
+    ends = np.r_[np.flatnonzero(cut)[1:] - 1, p.size - 1]
+    cum_polls = np.arange(1, p.size + 1)
+    cum_bookings = np.cumsum(y)
+    x = np.r_[0.0, cum_polls[ends] / cum_polls[-1]]
+    yv = np.r_[0.0, cum_bookings[ends] / cum_bookings[-1]]
+    return x, yv
+
+
+def _budget_at_recall(x, y, r):
+    j = np.searchsorted(y, r, side="left")  # first point with recall >= r
+    if j == 0:
+        return 0.0
+    y0, y1, x0, x1 = y[j - 1], y[j], x[j - 1], x[j]
+    return x0 if y1 == y0 else x0 + (r - y0) * (x1 - x0) / (y1 - y0)
+
+
+def gains_bootstrap(
+    df,
+    pred_col,
+    user_col="username",
+    label_col="has_booking",
+    target_recall=0.90,
+    n_boot=1000,
+    grid=None,
+    seed=0,
+):
+    rng = np.random.default_rng(seed)
+    grid = np.linspace(0.0, 1.0, 201) if grid is None else np.asarray(grid, float)
+    p = df[pred_col].to_numpy(float)
+    y = df[label_col].to_numpy(float)
+    if y.sum() == 0:
+        raise ValueError("no positive labels")
+
+    idx = list(df.groupby(user_col, sort=False).indices.values())  # rows per user
+    n_u = len(idx)
+
+    x0, y0 = _gains_curve(p, y)  # point estimate
+    point = {"curve": np.interp(grid, x0, y0), "budget": _budget_at_recall(x0, y0, target_recall)}
+
+    curves, budgets = np.empty((n_boot, grid.size)), np.empty(n_boot)
+    for b in range(n_boot):
+        rows = np.concatenate([idx[i] for i in rng.integers(0, n_u, n_u)])
+        xb, yb = _gains_curve(p[rows], y[rows])
+        curves[b] = np.interp(grid, xb, yb)
+        budgets[b] = _budget_at_recall(xb, yb, target_recall)
+
+    lo, med, hi = np.percentile(curves, [2.5, 50, 97.5], axis=0)
+    return {
+        "grid": grid,
+        **point,
+        "lo": lo,
+        "med": med,
+        "hi": hi,
+        "budgets": budgets,
+        "budget_ci": np.percentile(budgets, [2.5, 50, 97.5]),
+    }

@@ -11,9 +11,10 @@ from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.inspection import permutation_importance
 
-from cdc_ml.config import MODELS_DIR, PROCESSED_DATA_DIR, STAGE_1_PROCESSED
-from cdc_ml.features.build_features import drop_meta_high_card_cols
+from cdc_ml.config import MODELS_DIR, STAGE_1_PROCESSED
 from cdc_ml.modeling.baseline import *
+from cdc_ml.features.build_features import get_whale_users
+from reports import tracking
 
 app = typer.Typer()
 
@@ -28,6 +29,37 @@ def StratifiedUsernameKFold(df: pd.DataFrame):
     print(f"Train positive rate -> {df_train["has_booking"].mean()}")
     print(f"Test positive rate -> {df_test["has_booking"].mean()}")
     return df_train, df_test
+
+
+def rs_pr_auc(
+    df: pd.DataFrame,
+    feats_list: dict,
+    iter=1,
+    lr=0.03,
+    m_depth=2,
+    min_child=10,
+    reg_lamb=10,
+):
+    """runs x times iterations under different random seed"""
+
+    seeds = np.random.default_rng(0).choice(10_000, size=iter, replace=False)
+
+    xgb_pr_auc = {m: [] for m in feats_list}
+    for seed in seeds:
+        for model, model_features in feats_list.items():
+            oof_xgb, *_ = train(
+                df,
+                model_features,
+                lr=lr,
+                m_depth=m_depth,
+                min_child=min_child,
+                reg_lamb=reg_lamb,
+                seed=int(seed),
+            )
+            score = average_precision_score(df["has_booking"].to_numpy(), oof_xgb)
+            xgb_pr_auc[model].append(score)
+
+    return xgb_pr_auc
 
 
 def train(
@@ -59,8 +91,9 @@ def train(
     tr_brier_list, tr_pr_list = [], []
     models, importances, importances_std = [], [], []
 
-    whales_pt_mask = df["username"].isin(["anmol", "jy", "mya"]).to_numpy()
-    whales_pc_mask = df["username"].isin(["kim", "jy", "flower"]).to_numpy()
+    whales_pc, whales_pt = get_whale_users()
+    whales_pt_mask = df["username"].isin(whales_pt).to_numpy()
+    whales_pc_mask = df["username"].isin(whales_pc).to_numpy()
 
     sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=seed)
     for fold, (tr, va) in enumerate(sgkf.split(X, y=df["has_booking"], groups=df["username"])):
@@ -200,7 +233,7 @@ def train(
         f"Average importances\n{avg_df}"
     )
 
-    return oof["xgb"], oof["add"], models, whales_pc_mask
+    return oof["xgb"], oof["add"]
 
 
 def train_on_disk(data: Path, models: Path):
