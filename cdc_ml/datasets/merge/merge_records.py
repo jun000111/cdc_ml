@@ -8,7 +8,6 @@ from cdc_ml.config import (
     RECORDS_PROCESSED,
     PROPER_RECORDS_INTERIM,
     PSEUDO_BOOKINGS_INTERIM,
-    CUSTOMER_CLASS_PROCESSED,
 )
 from cdc_ml.datasets.merge.schema import MergeRecordsPseudo
 
@@ -33,30 +32,29 @@ def assign_class_type(df_records: pd.DataFrame, df_class: pd.DataFrame):
 
 
 def merge_df(
-    df_records: pd.DataFrame, df_pseudo: pd.DataFrame, df_class: pd.DataFrame
+    df_records: pd.DataFrame,
+    df_pseudo: pd.DataFrame,
 ) -> pd.DataFrame:
 
     # join the records
     df_complete_records = pd.concat([df_records, df_pseudo], axis=0, ignore_index=True)
     df_complete_records.insert(0, "id", range(len(df_complete_records)))
 
-    df = assign_class_type(df_complete_records, df_class)
-    all_user_included(df)
-    return MergeRecordsPseudo.validate(df)
+    # df = assign_class_type(df_complete_records, df_class)
+    # all_user_included(df_complete_records)
+    return MergeRecordsPseudo.validate(df_complete_records)
 
 
 def merge_on_disk(
     interim_output_path: Path = RECORDS_PROCESSED,
     records_input_path: Path = PROPER_RECORDS_INTERIM,
     pseudo_input_path: Path = PSEUDO_BOOKINGS_INTERIM,
-    class_input_path: Path = CUSTOMER_CLASS_PROCESSED,
 ) -> None:
 
     logger.info(f"Merging proper and pseudo records...")
     df_records = pd.read_parquet(records_input_path)
     df_pseudo = pd.read_parquet(pseudo_input_path)
-    df_class = pd.read_parquet(class_input_path)
-    df = merge_df(df_records, df_pseudo, df_class)
+    df = merge_df(df_records, df_pseudo)
     logger.info(f"Total {len(df)} rows by {len(df.columns)} columns")
     interim_output_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(interim_output_path, index=False)
@@ -68,9 +66,8 @@ def merge(
     interim_output_path: Path = RECORDS_PROCESSED,
     records_input_path: Path = PROPER_RECORDS_INTERIM,
     pseudo_input_path: Path = PSEUDO_BOOKINGS_INTERIM,
-    class_input_path: Path = CUSTOMER_CLASS_PROCESSED,
 ):
-    merge_on_disk(interim_output_path, records_input_path, pseudo_input_path, class_input_path)
+    merge_on_disk(interim_output_path, records_input_path, pseudo_input_path)
 
 
 if __name__ == "__main__":

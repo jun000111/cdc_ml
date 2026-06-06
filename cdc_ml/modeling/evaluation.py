@@ -7,38 +7,54 @@ from sklearn.model_selection import cross_val_score
 from sklearn.ensemble import RandomForestClassifier
 
 
-def model_comparison(oof: dict):
+def compare_feature_sets(xgb_records: pd.DataFrame):
 
-    model_metric = pd.DataFrame(
-        {
-            "model": oof.keys(),
-            "mean": [np.mean(v) for v in oof.values()],
-            "std": [np.std(v) for v in oof.values()],
-        }
+    latest_run = xgb_records.loc[xgb_records["run_id"] == xgb_records["run_id"].max()]
+    latest_run = latest_run.loc[latest_run["model"] == "xgb"]
+
+    full_mean = latest_run.loc[latest_run["features"] == "full"]["pr_auc_pooled"].mean()
+
+    model_metrics = (
+        latest_run.groupby("features")
+        .agg(mean=("pr_auc_pooled", "mean"), std=("pr_auc_pooled", "std"))
+        .assign(gap_abs=lambda x: x["mean"] - full_mean)
     )
 
-    return model_metric
+    return model_metrics
 
 
 def paired_t(
-    model_metric: dict,
-    better: str,
-    worse: str,
+    xgb_records: pd.DataFrame,
+    model_1_name: str,
+    model_2_name: str,
 ):
-    """returns d,t,p,ci,n_pos"""
+    """returns d,t,p,ci,n_pos in dataframe form"""
 
-    diff = np.asarray(model_metric[better]) - np.asarray(
-        model_metric[worse]
+    latest_run = xgb_records.loc[xgb_records["run_id"] == xgb_records["run_id"].max()]
+    latest_run = latest_run.loc[latest_run["model"] == "xgb"]
+
+    model_1_metrics = latest_run[latest_run["features"] == model_1_name]["pr_auc_pooled"]
+    model_2_metrics = latest_run[latest_run["features"] == model_2_name]["pr_auc_pooled"]
+    diff = np.asarray(model_1_metrics) - np.asarray(
+        model_2_metrics
     )  # paired, row-wise by iteration
-    print(len(diff))
     d_bar = diff.mean()  # = +0.0019, your point estimate
-    t, p = stats.ttest_rel(model_metric[better], model_metric[worse])  # two-sided
+    t, p = stats.ttest_rel(model_1_metrics, model_2_metrics)  # two-sided
     ci = stats.t.interval(
         0.95, len(diff) - 1, loc=d_bar, scale=diff.std(ddof=1) / np.sqrt(len(diff))
     )
     n_pos = (diff > 0).sum()  # how many of 20 seeds favored dow
 
-    return d_bar, t, p, ci, n_pos
+    return pd.DataFrame(
+        {
+            "d": d_bar,
+            "t": t,
+            "p": p,
+            "ci": [f"{ci[0]} , {ci[1]}"],
+            "n_pos": n_pos,
+            "n_total": len(diff),
+        }
+    )
 
 
 def pr_auc_ci_by_user(y, score, user_ids, n_boot=1000, seed=0):

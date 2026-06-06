@@ -49,8 +49,7 @@ def validate_booking_records(df_poll: pd.DataFrame, df_records: pd.DataFrame):
     if not invalid_records.empty:
         logger.error(f"{len(invalid_records)} in records")
         raise ValueError(
-            f"{len(invalid_records)} in records"
-            f"sample ids: {invalid_records["username"].head().tolist()}"
+            f"{len(invalid_records)} in records" f"sample ids: {invalid_records.head()}"
         )
     logger.info("All booking records are validated against booking cycle...")
 

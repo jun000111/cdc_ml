@@ -3,6 +3,7 @@ from loguru import logger
 import typer
 import pandas as pd
 import numpy as np
+from cdc_ml.features.schema import FinalSet
 
 from cdc_ml.config import (
     POLLS_PROCESSED,
@@ -12,9 +13,6 @@ from cdc_ml.config import (
 )
 
 app = typer.Typer()
-
-import numpy as np
-import pandas as pd
 
 
 def assign_pref(df: pd.DataFrame, df_pref: pd.DataFrame) -> pd.DataFrame:
@@ -70,30 +68,39 @@ def assign_pref(df: pd.DataFrame, df_pref: pd.DataFrame) -> pd.DataFrame:
         .merge(pref_dow_wide, on="id", how="left")
     )
 
-    # ----------------------------
-    # 5. Time window features
-    # ----------------------------
-    pref_start_end = df_pref.drop_duplicates("id")[["id", "pref_start", "pref_end"]]
-    df = df.merge(pref_start_end, on="id", how="left")
+    id_dates = df_pref.groupby("id")["date"].agg(list).reset_index()
 
-    pref_range = (df["pref_end"] - df["pref_start"]).dt.total_seconds() / 3600
-    poll_range = (df["pref_end"] - df["polling_at"]).dt.total_seconds() / 3600
+    df = df.merge(id_dates, on="id", how="left")
+    df["pref_valid"] = df.apply(
+        lambda row: sum(x > row["polling_at"] for x in row["date"]), axis=1
+    )
 
-    df["countdown"] = np.minimum(pref_range, poll_range)
-
-    return df
+    return FinalSet.validate(df)
 
 
-def get_whale_users():
-    """Returns polling count and polling total whales"""
+def get_whale_users(poll_threshold: float = 0.5, booking_threshold: float = 0.5):
+    """
+    Returns users who collectively account for the top X% of
+    total poll volume (pc) and total bookings (pt).
+
+    Uses cumulative concentration (Pareto-style), not per-user percentile.
+
+    poll count , positive total
+
+    """
     df = pd.read_parquet(POLLS_PROCESSED)
-    poll_counts = df.groupby(["username"]).size()
-    whales_pc_threshold = poll_counts.quantile(0.8)
-    whales_pc_users = poll_counts[poll_counts >= whales_pc_threshold].index
 
-    positive_counts = df.groupby(["username"])["has_booking"].sum()
-    whales_pt_threshold = positive_counts.quantile(0.8)
-    whales_pt_users = positive_counts[positive_counts >= whales_pt_threshold].index
+    # --- Poll count whales ---
+    poll_counts = df.groupby("username").size().sort_values(ascending=False)
+    cumulative_polls = poll_counts.cumsum().shift(fill_value=0)
+    whales_pc_users = poll_counts[cumulative_polls < poll_threshold * poll_counts.sum()].index
+
+    # --- Booking count whales ---
+    positive_total = df.groupby("username")["has_booking"].sum().sort_values(ascending=False)
+    cumulative_bookings = positive_total.cumsum().shift(fill_value=0)
+    whales_pt_users = positive_total[
+        cumulative_bookings < booking_threshold * positive_total.sum()
+    ].index
 
     return whales_pc_users, whales_pt_users
 
