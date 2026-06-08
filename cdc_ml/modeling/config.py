@@ -1,5 +1,13 @@
+# FEATS_ABL_LIST = {
+#     "loo": {
+#         "full_wo_pref_dow": {"full": FULL + PREF_DOW, "wo_pref_dow": FULL},
+#     },
+# }
+
 RANDOM_STATE = 5
 CV_SPLITS = 5
+
+BASELINE = ["polling_hour", "polling_dow"]
 
 FULL = [
     "polling_hour",
@@ -11,7 +19,6 @@ FULL = [
     "class_type",
     "is_one_team",
 ]
-
 PREF_DOW = [
     "pref_dow_count_0",
     "pref_dow_count_1",
@@ -21,19 +28,54 @@ PREF_DOW = [
     "pref_dow_count_5",
     "pref_dow_count_6",
 ]
+FULL_CORE = [g for g in FULL if g not in ["pref_valid", "pref_unique_day", "pref_coverage"]]
 
 FEATS_ABL_LIST = {
-    "full": FULL + PREF_DOW,
-    "minus_pref_dow": FULL,
-    # "minus_pref_coverage": [g for g in FULL if g != "pref_coverage"] + PREF_DOW,
-    # "minus_countdown": [g for g in FULL if g != "countdown"] + PREF_DOW,
-    # "minus_pref_unique_day": [g for g in FULL if g != "pref_unique_day"] + PREF_DOW,
-    # "minus_pref_unique_timeslot": [g for g in FULL if g != "pref_unique_timeslot"] + PREF_DOW,
-    # "minus_class_type": [g for g in FULL if g != "class_type"] + PREF_DOW,
-    "minus_is_one_team": [g for g in FULL if g != "is_one_team"] + PREF_DOW,
+    "baseline": {
+        "baseline": {
+            "baseline": BASELINE,
+        },
+    },
+    "step1": {
+        "full_wo_pref_dow": {
+            "full": FULL + PREF_DOW,
+            "wo_pref_dow": FULL,
+        },
+    },
+    "step2": {
+        "full_loo": {
+            "full": FULL,
+            "wo_pref_coverage": [g for g in FULL if g != "pref_coverage"],
+            "wo_pref_valid": [g for g in FULL if g != "pref_valid"],
+            "wo_pref_unique_day": [g for g in FULL if g != "pref_unique_day"],
+            "wo_pref_unique_timeslot": [g for g in FULL if g != "pref_unique_timeslot"],
+            "wo_class_type": [g for g in FULL if g != "class_type"],
+            "wo_is_one_team": [g for g in FULL if g != "is_one_team"],
+            "wo_valid_unique_coverage": [
+                g for g in FULL if g not in ["pref_valid", "pref_unique_day", "pref_coverage"]
+            ],
+        },
+    },
+    "step3": {
+        "core_loo": {
+            "full": FULL_CORE,
+            # "wo_pref_coverage": [g for g in FULL_CORE if g != "pref_coverage"],
+            "wo_pref_unique_timeslot": [g for g in FULL_CORE if g != "pref_unique_timeslot"],
+            "wo_class_type": [g for g in FULL_CORE if g != "class_type"],
+            "wo_is_one_team": [g for g in FULL_CORE if g != "is_one_team"],
+        },
+    },
 }
 
-CHOSEN_FEATURES = "minus_pref_dow"
+
+CHOSEN_FEATURES = [
+    "polling_hour",
+    "polling_dow",
+    "pref_unique_timeslot",
+    "class_type",
+    "is_one_team",
+]
+
 
 PARAM_DIST = {
     "n_estimators": [200, 400, 600, 800],

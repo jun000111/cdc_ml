@@ -14,6 +14,6 @@ def _to_jsonable(o):
 
 def log_run(config: dict, metrics: dict):
     FEATURE_ABLATIONS_RESULTS.parent.mkdir(parents=True, exist_ok=True)
-    record = {"run_at": datetime.datetime.now().isoformat(timespec="seconds"), **config, **metrics}
+    record = {**config, **metrics}
     with FEATURE_ABLATIONS_RESULTS.open("a") as f:
         f.write(json.dumps(record, default=_to_jsonable) + "\n")
