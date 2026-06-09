@@ -83,9 +83,16 @@ OOF cold-start is the headline; the untouched test set is a lower but cleaner ch
 | **OOF (cold-start)** | 30 | 1.4% | 0.071 | **5.1×** | [2.2×, 7.4×] |
 | Test | 7 | 1.1% | 0.034 | 3.1× | [1.7×, 5.6×] |
 | Production (all data) | 37 | 1.3% | 0.047 | 3.6× | [1.8×, 5.6×] |
+
+
 ![OOF](reports/figures/dev_train_bootstrap.png)
+*PR AUC with 95% CI from customer-level bootstrap resampling of the OOF predictions*
+
 ![TEST](reports/figures/dev_test_bootstrap.png)
+*PR AUC with 95% CI from customer-level bootstrap resampling of the held out set*
+
 ![PROD](reports/figures/prod_bootstrap.png)
+*PR AUC with 95% confidence intervals from customer-level bootstrap resampling of out-of-fold predictions over the full dataset*
 
 The OOF–test gap is mostly noise: the CIs overlap, the test set is 7 customers (its whale segment is basically one person), and there's some train↔test shift (adversarial AUC 0.81). OOF also doubled as the selection metric, so it runs a bit optimistic — the lower test number fits that, not a generalization failure.
 
