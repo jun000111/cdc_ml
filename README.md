@@ -115,15 +115,15 @@ Most of the value is in timing alone — even the baseline keeps ~90% of booking
 
 **Per-customer guardrail** — at a 60% polling budget, whales keep a median 92% of bookings, non-whales 100%. The occasional zero is a customer with 1–2 bookings where one miss tanks a tiny denominator — useful for catching starvation cases before launch.
 
-![PER_OOF](reports/figures/recall_by_segement_oof.png)
+![PER_OOF](reports/figures/recall_by_segment_oof.png)
 
 *Recall by segement of the OOF prediction*
 
-![PER_TEST](reports/figures/recall_by_segement_test.png)
+![PER_TEST](reports/figures/recall_by_segment_test.png)
 
 *Recall by segement of the held out test set*
 
-![PER_PROD](reports/figures/recall_by_segement_prod.png)
+![PER_PROD](reports/figures/recall_by_segment_prod.png)
 
 *Recall by segement of the OOF prediction on the full dataset*
 
