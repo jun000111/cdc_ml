@@ -14,4 +14,4 @@ def make_holdout_split(df: pd.DataFrame):
     print(f"Baseline positive rate -> {df["has_booking"].mean()}")
     print(f"Train positive rate -> {df_train["has_booking"].mean()}")
     print(f"Test positive rate -> {df_test["has_booking"].mean()}")
-    return df_train, df_test
+    return df_train.reset_index(drop=True), df_test.reset_index(drop=True)

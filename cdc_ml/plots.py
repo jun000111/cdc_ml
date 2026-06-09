@@ -7,6 +7,122 @@ from cdc_ml.modeling.calibrate import *
 from cdc_ml.modeling.evaluation import gains_bootstrap
 import seaborn as sns
 import pandas as pd
+from cdc_ml.config import EXTERNAL_DATA_DIR
+from cdc_ml.modeling.predict import predict
+
+
+from matplotlib.colors import ListedColormap
+
+
+def production_visualization(
+    username: str,
+    end_month: int,
+    end_day: int,
+    user_id: int = 6,
+    threshold: float | None = None,
+    retention: float | None = 0.8,
+):
+    """Per-customer polling schedule under a score cutoff.
+
+    Cells the bot would poll are drawn on the Blues ramp; cells it would
+    skip are greyed out. Pass an absolute `threshold`, or a `retention`
+    fraction (keep the top X% of polls) — the threshold is then the matching
+    quantile of the *system-wide* score distribution, i.e. the real
+    production operating point applied to this one customer.
+    """
+    preferences_df = pd.read_excel(EXTERNAL_DATA_DIR / "cus_pref.xlsx")
+    cycles_df = pd.read_excel(EXTERNAL_DATA_DIR / "cus_cycle.xlsx")
+    predictions_df = predict(preferences_df, cycles_df)
+
+    # Global operating point: the (1 - retention) quantile over ALL polls.
+    if threshold is None:
+        threshold = float(predictions_df["pred"].quantile(1 - retention))
+
+    user_predictions = predictions_df.loc[
+        (predictions_df["username"] == username) & (predictions_df["id"] == user_id)
+    ].copy()
+
+    user_predictions = user_predictions.loc[
+        (user_predictions["polling_month"] < end_month)
+        | (
+            (user_predictions["polling_month"] == end_month)
+            & (user_predictions["polling_day"] <= end_day)
+        )
+    ]
+
+    # FIX 2: real date for chronological ordering; the "8-9" vs "8-12" string
+    # sort would otherwise put "8-12" before "8-9".
+    user_predictions["date_key"] = pd.to_datetime(
+        pd.DataFrame(
+            {
+                "year": 2000,
+                "month": user_predictions["polling_month"],
+                "day": user_predictions["polling_day"],
+            }
+        )
+    )
+    user_predictions["date"] = (
+        user_predictions["polling_month"].astype(str)
+        + "-"
+        + user_predictions["polling_day"].astype(str)
+    )
+    date_order = user_predictions.drop_duplicates("date").sort_values("date_key")["date"].tolist()
+
+    heatmap_df = (
+        user_predictions.pivot_table(
+            index="date", columns="polling_hour", values="pred", fill_value=0
+        )
+        .reindex(index=date_order)
+        .reindex(columns=range(24), fill_value=0)
+    )
+
+    kept = heatmap_df >= threshold
+    flat = heatmap_df.to_numpy().ravel()
+    poll_frac = (flat >= threshold).mean()
+    exp_recall = flat[flat >= threshold].sum() / flat.sum() if flat.sum() else 0.0
+    vmax = heatmap_df.to_numpy().max()
+
+    fig, ax = plt.subplots(figsize=(16, 8))
+
+    # Skipped cells: flat grey, muted annotations.
+    sns.heatmap(
+        heatmap_df,
+        mask=kept,
+        cmap=ListedColormap(["#eeeeee"]),
+        cbar=False,
+        annot=True,
+        fmt=".3f",
+        annot_kws={"color": "#8a8a8a", "fontsize": 7},
+        linewidths=0.5,
+        linecolor="white",
+        ax=ax,
+    )
+    # Kept cells: Blues, auto-contrast annotations.
+    sns.heatmap(
+        heatmap_df,
+        mask=~kept,
+        cmap="Blues",
+        vmin=0,
+        vmax=vmax,
+        cbar=True,
+        cbar_kws={"label": "P(booking)"},
+        annot=True,
+        fmt=".3f",
+        annot_kws={"fontsize": 7},
+        linewidths=0.5,
+        linecolor="white",
+        ax=ax,
+    )
+
+    ax.set_title(
+        f"{username} — threshold {threshold:.3f}  ·  "
+        f"polling {poll_frac:.0%} of slots  ·  "
+        f"~{exp_recall:.0%} expected bookings retained"
+    )
+    ax.set_xlabel("Hour")
+    ax.set_ylabel("Date")
+    fig.tight_layout()
+    plt.show()
 
 
 def plot_additive_heatmap(

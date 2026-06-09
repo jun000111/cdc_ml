@@ -90,7 +90,6 @@ def run_cv(
                 n_estimators=500,
                 max_depth=6,
                 min_samples_leaf=50,
-                max_features=None,  # only 2 features — let every split see both; diversity comes from bagging
                 n_jobs=-1,
                 random_state=seed,
             )

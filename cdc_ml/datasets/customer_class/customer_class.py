@@ -51,7 +51,11 @@ def add_non_standard_records(df_class: pd.DataFrame) -> pd.DataFrame:
         list(CUSTOMER_CLASS_DIC.items()), columns=["username", "class_type"]
     )
 
-    return pd.concat([df_class, add_classes], axis=0, ignore_index=True)
+    res = pd.concat([df_class, add_classes], axis=0, ignore_index=True).drop_duplicates(
+        subset=["username"]
+    )
+
+    return res
 
 
 def modify_class_type(df_class: pd.DataFrame) -> pd.DataFrame:
@@ -64,6 +68,7 @@ def modify_class_type(df_class: pd.DataFrame) -> pd.DataFrame:
     assigned_one_team["class_type"] = assigned_one_team["class_type"].replace(
         flatten_dic(CLASS_MAPPING)
     )
+
     return assigned_one_team
 
 

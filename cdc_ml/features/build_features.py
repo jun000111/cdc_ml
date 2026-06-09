@@ -67,10 +67,10 @@ def assign_pref(df: pd.DataFrame, df_pref: pd.DataFrame) -> pd.DataFrame:
         .merge(pref_unique_timeslot, on="id", how="left")
         .merge(pref_dow_wide, on="id", how="left")
     )
-
     id_dates = df_pref.groupby("id")["date"].agg(list).reset_index()
 
     df = df.merge(id_dates, on="id", how="left")
+    # print(df)
     df["pref_valid"] = df.apply(
         lambda row: sum(x > row["polling_at"] for x in row["date"]), axis=1
     )

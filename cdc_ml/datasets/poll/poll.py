@@ -13,26 +13,38 @@ app = typer.Typer()
 
 
 def build_poll_df(
-    username: pd.Series, cycle_start: pd.Series, cycle_end: pd.Series
+    username: pd.Series, cycle_id: pd.Series, cycle_start: pd.Series, cycle_end: pd.Series
 ) -> pd.DataFrame:
 
     rows = []
-    cycle_id = 0
-    for username, cycle in zip(username, zip(cycle_start, cycle_end)):
+    for username, cycle in zip(username, zip(cycle_start, cycle_end, cycle_id)):
         polling_timestamp = pd.date_range(cycle[0], cycle[1], freq="1h")
         for hour in polling_timestamp:
             rows.append(
                 {
-                    "id": cycle_id,
+                    "id": cycle[2],
                     "username": username,
                     "cycle_start": cycle[0].as_unit("us"),
                     "cycle_end": cycle[1].as_unit("us"),
                     "polling_at": hour.as_unit("us"),
                 }
             )
-        cycle_id += 1
 
-    return pd.DataFrame(rows)
+    df_poll = pd.DataFrame(rows)
+    df_poll = df_poll.assign(
+        cycle_start_month=lambda d: d["cycle_start"].dt.month,
+        cycle_start_day=lambda d: d["cycle_start"].dt.day,
+        cycle_start_dow=lambda d: d["cycle_start"].dt.day_of_week,
+        cycle_start_hour=lambda d: d["cycle_start"].dt.hour,
+        polling_month=lambda d: d["polling_at"].dt.month,
+        polling_day=lambda d: d["polling_at"].dt.day,
+        polling_dow=lambda d: d["polling_at"].dt.day_of_week,
+        polling_hour=lambda d: d["polling_at"].dt.hour,
+        hours_into_cycle=lambda d: (d["polling_at"] - d["cycle_start"]).dt.total_seconds() / 3600,
+    )
+    df_poll["polling_at"] = df_poll["polling_at"].dt.floor("h")
+
+    return df_poll
 
 
 def validate_booking_records(df_poll: pd.DataFrame, df_records: pd.DataFrame):
@@ -56,31 +68,21 @@ def validate_booking_records(df_poll: pd.DataFrame, df_records: pd.DataFrame):
 
 def add_label(df_poll: pd.DataFrame, df_records: pd.DataFrame) -> pd.DataFrame:
     df_poll = df_poll.copy()  # don't mutate the caller's frame
-    df_poll["polling_at"] = df_poll["polling_at"].dt.floor("h")
 
     booking_hour = df_records["booking_at"].dt.floor("h")
     booking_keys = pd.MultiIndex.from_arrays([df_records["username"], booking_hour])
     polling_keys = pd.MultiIndex.from_arrays([df_poll["username"], df_poll["polling_at"]])
     df_poll["has_booking"] = polling_keys.isin(booking_keys)  # bool, no fan-out, no phantom rows
 
-    df_poll = df_poll.assign(
-        cycle_start_month=lambda d: d["cycle_start"].dt.month,
-        cycle_start_day=lambda d: d["cycle_start"].dt.day,
-        cycle_start_dow=lambda d: d["cycle_start"].dt.day_of_week,
-        cycle_start_hour=lambda d: d["cycle_start"].dt.hour,
-        polling_month=lambda d: d["polling_at"].dt.month,
-        polling_day=lambda d: d["polling_at"].dt.day,
-        polling_dow=lambda d: d["polling_at"].dt.day_of_week,
-        polling_hour=lambda d: d["polling_at"].dt.hour,
-        hours_into_cycle=lambda d: (d["polling_at"] - d["cycle_start"]).dt.total_seconds() / 3600,
-    )
     return df_poll
 
 
 def generate_df(df_cycle: pd.DataFrame, df_records: pd.DataFrame) -> pd.DataFrame:
     df_cycle = df_cycle.copy()
     df_records = df_records.copy()
-    df_poll = build_poll_df(df_cycle["username"], df_cycle["cycle_start"], df_cycle["cycle_end"])
+    df_poll = build_poll_df(
+        df_cycle["username"], df_cycle["id"], df_cycle["cycle_start"], df_cycle["cycle_end"]
+    )
     validate_booking_records(df_poll, df_records)
     # df_poll = left_join(df_poll, df_class)
     df_poll = add_label(df_poll, df_records)

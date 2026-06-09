@@ -35,7 +35,9 @@ def convert_column_type(df: pd.DataFrame) -> pd.DataFrame:
     df["range"] = df["range"].astype(str)
 
     df["username"] = df["username"].str.lower()
+    df.tail()
     df.insert(0, "id", range(len(df)))
+
     return df
 
 
@@ -52,6 +54,7 @@ def clean_df(df: pd.DataFrame) -> pd.DataFrame:
 
     df = df.copy()
     logger.info(f"Pre cleaning:{len(df)} rows x {len(df.columns)} columns")
+
     df = convert_column_type(df)
 
     df = filter_na_date_mask(df)
