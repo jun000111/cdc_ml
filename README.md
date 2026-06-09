@@ -118,11 +118,12 @@ Most of the value is in timing alone — even the baseline keeps ~90% of booking
 ![PER_OOF](reports/figures/recall_by_segement_oof.png)
 
 *Recall by segement of the OOF prediction*
-![PER_OOF](reports/figures/recall_by_segement_test.png)
+
+![PER_TEST](reports/figures/recall_by_segement_test.png)
 
 *Recall by segement of the held out test set*
 
-![PER_OOF](reports/figures/recall_by_segement_prod.png)
+![PER_PROD](reports/figures/recall_by_segement_prod.png)
 
 *Recall by segement of the OOF prediction on the full dataset*
 
