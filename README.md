@@ -1,179 +1,157 @@
-# cdc_ml — Booking Prediction for a Slot-Polling Automation System
+# Booking Prediction Model (`cdc_ml`)
 
-A machine-learning layer built on top of a production booking-automation system. The system polls a driving-centre booking portal every 3–5 minutes per customer, 24/7, and claims newly-available slots that match customer preferences. This project adds a ranking model that prioritises which polls to execute, reducing polling volume while preserving booking outcomes.
+Predicting whether a single poll will produce a bookable lesson slot, so the polling system can **drop low-value polls without losing bookings**.
 
----
+This model sits on top of a production polling bot. The bot re-checks each customer's preferred day/timeslot combinations every few minutes, 24/7, and grabs slots that free up when other learners cancel. Polling is cheap individually but expensive in aggregate. The model ranks upcoming polls by booking probability so the system can retain only the highest-value subset.
 
-## Results summary
-
-| Metric | Value |
-|--------|-------|
-| PR-AUC (dev OOF, 5-fold grouped CV) | **0.071 · 5.2× over base rate** |
-| 95% bootstrap CI | [2.2×, 7.4×] |
-| Polling reduction at ~90% booking retention | **~40%** |
-| Bookings captured within top 10% of polls | **~46%** |
-
-> **Evaluation note.** The primary metric is out-of-fold (OOF) PR-AUC under `StratifiedGroupKFold` grouped by customer. Each fold withholds a disjoint set of customers entirely, so the OOF estimates cold-start performance on customers the model has never seen. Base rate is ~1.3% (severe class imbalance), making PR-AUC the appropriate primary metric.
-
----
-
-## System overview
-
-```
-Customer ──► Preference config ──────────────────────┐
-                                                      │
-Booking portal ──► Slot released ──► Poll captured ──►│──► ML model ──► ranked poll queue ──► bot executes top-N
-                                                      │
-                                         Historical   │
-                                         polling log ─┘
-```
-
-The end-to-end system comprises:
-
-- **Polling bot** — checks availability every 3–5 min per customer, books on match
-- **Backend API** — manages polling state, customer preferences, and booking records
-- **Frontend** — customer-facing preference management
-- **Telegram notifications** — real-time booking alerts
-- **`cdc_ml`** — ML layer that scores each pending poll and ranks by predicted booking probability
+The companion notebook (`4.01-report`) is the full writeup; this README is the summary.
 
 ---
 
 ## Problem framing
 
-A **poll** is one check of the portal for one customer at one hour. The label `has_booking` is `True` if that poll resulted in a booking. The model estimates P(booking | poll context), where context is the poll timing and the customer's preference window.
+The booking signal is **supply-side**: a slot only appears when someone else cancels. So the question isn't "does this customer want this slot" (they already declared it as a preference) but "is a matching slot likely to free up around this time." That reframes the whole problem around *when* polls happen and *how broad* a customer's preferences are, rather than customer intent.
 
-The booking signal is **supply-side**: a slot only becomes available when another learner cancels. Booking probability is therefore driven by when cancellations tend to occur and how many preference slots a customer has open (preference features).
-
-Class imbalance is severe: approximately 1.3% of polls result in a booking.
+The model supports exactly one decision: **rank a customer's upcoming polls by predicted probability and execute only the top fraction.**
 
 ---
 
-## Model
+## Data
 
-**Architecture:** XGBoost classifier with Platt scaling calibration  
-**Features (5 total):**
+| | |
+|---|---|
+| Source | Real polling logs + customer-type table + preference windows (identifiers anonymized) |
+| Grain | One row per `(customer, polling_hour)` — poll timestamps aren't retained, so hourly is the finest resolution |
+| Size | 37 customers · 29,612 rows · 390 bookings (**1.3% base rate**) |
+| Span | ~9 months (Aug 2025 – Apr 2026) |
+| Validation | All cleaned/derived tables enforced with **Pandera** (timestamp integrity, `pref_start < pref_end`, range/sanity checks, binary-column constraints) |
 
-| Feature | Type | Rationale |
-|---------|------|-----------|
-| `polling_hour` | Temporal | Strongest predictor; cancellations cluster during daytime |
-| `polling_dow` | Temporal | Weekend penalty observed in booking rates |
-| `pref_unique_timeslot` | Preference | Threshold effect at 6–7 distinct timeslots; wider windows are easier to satisfy |
-| `class_type` | Customer | Separates booking difficulty by pool type |
-| `is_one_team` | Customer | One-team customers have wider slot access |
+**Two biases that shape what the metrics mean** — and stating them up front is part of the analysis:
 
-**Calibration:** Platt scaling on pooled OOF predictions. Isotonic regression ruled out — too few positives (~1.3%) for a stable non-parametric fit.
+1. **Sample is conditioned on success.** Nearly all retained cycles contain ≥1 booking, which over-represents easy-to-convert configurations. It removes few one-team customers (who book easily) but many common-pool customers, so the observed gap between the two groups is *compressed* relative to the true population.
+2. **Polling is preference-conditioned.** The bot only polls inside declared preferences, so the data only covers preferred day/timeslot regions. Predictions outside them are extrapolation — but this matches deployment exactly, since the live system also only scores preference-conditioned polls.
+
+Reported metrics therefore describe **relative ranking quality within this sample**, not population-level booking forecasts.
 
 ---
 
 ## Evaluation design
 
-- **Split:** `StratifiedGroupKFold` grouped by `username` — each customer appears entirely in one partition
-- **Goal:** cold-start generalisation to customers not seen during training
-- **Primary metric:** PR-AUC (average precision) — appropriate under severe imbalance; ROC-AUC dominated by the large negative class
-- **Uncertainty:** customer-level bootstrap on OOF predictions (resamples customers, not rows)
-- **Baselines:** additive look-up table (DOW + hour), joint DOW×hour table, marginal tables, Random Forest
+- **Group split by `username`** (both holdout and CV). Polls from one customer share near-identical timing/preference signatures, so a row-level split would leak. `username` is a grouping key only, never a feature. The objective is **cold-start generalization to unseen customers.**
+- **`StratifiedGroupKFold`** preserves customer separation while holding the ~1.3% positive rate roughly constant across folds. ~20% of customers held out as test (train: 30 users / test: 7 users).
+- **PR-AUC is the primary metric.** At this prevalence ROC-AUC stays misleadingly high on the negatives; PR-AUC focuses on the booking class. Brier is a secondary (relative) calibration measure; the gains curve is the operational metric.
+- **Uncertainty via customer-level bootstrap, not repeated seeds.** A handful of high-volume "whale" customers dominate the data, so reseeding mostly reshuffles the same whales between folds — it doesn't probe the real source of variance. Resampling *customers* does.
+- **Whale vs non-whale reported separately throughout.** ~8 customers drive ~half of polling and ~5 drive ~half of bookings, so pooled metrics can hide segment-level behavior. A feature is only kept if it helps the segment of interest, not just the pooled number.
 
 ---
 
-## Operational impact (OOF, 30 training customers)
+## Features
 
-The gains curve shows how many bookings are retained as the polling budget decreases:
+A funnel: four candidate families filtered by three criteria — **available at inference**, **non-redundant**, and **demonstrated lift**.
 
-| Polling budget | Bookings retained | Model | Additive baseline |
-|---------------|------------------|-------|-------------------|
-| Top 10% of polls | ~46% | ← | ~27% |
-| Top 21% of polls | ~60% | ← | — |
-| Top 28% of polls | ~70% | ← | — |
-| Top 42% of polls | ~80% | ← | ~48% |
-| Top 60% of polls | ~90% | ← | ~62% |
+| Family | Outcome |
+|---|---|
+| Polling (`polling_hour`, `polling_dow`, …) | **Kept** the two timing features; dropped `polling_day` (redundant with `dow` by Cramér's V) and `polling_month` (only 9 months, would extrapolate) |
+| Preference (`pref_unique_timeslot`, `pref_coverage`, `pref_valid`, …) | Collapsed to **`pref_unique_timeslot`** — the rest were correlated summaries of the same window |
+| Customer-type (`class_type`, `is_one_team`) | **Kept both** — major axis of booking difficulty |
+| Cycle (`cycle_start_*`, `hours_into_cycle`) | **Dropped entirely** — some unavailable at inference (`cycle_end`), others redundant with polling features, and a `00:00` backlog-default artifact contaminates `cycle_start_hour` |
 
-The largest advantage over the timing-only baseline appears at the most selective end of the ranking. At 90% booking retention, the gap is small (~2 percentage points). The model adds most value when polling must be cut to below 30% of its original volume.
+**Final feature set (5):** `polling_hour`, `polling_dow`, `pref_unique_timeslot`, `class_type`, `is_one_team`.
 
-### Per-customer guardrail (60% budget)
-
-Aggregate gains curves can mask uneven distribution across customers.
-
-| Segment | Median recall | Min recall | n |
-|---------|-------------|-----------|---|
-| Whales (OOF) | 92% | 65% | 4 |
-| Non-whales (OOF) | 100% | 0% | 26 |
-| Whales (test) | 98% | 95% | 2 |
-| Non-whales (test) | 100% | 100% | 5 |
-
-The 0% minimum for a non-whale customer reflects a low-volume case (1–2 bookings) where a single booking fell below the cutoff — a denominator effect rather than a systematic failure.
+Preference features are deterministic functions of the cycle config (declared at creation), so they introduce **no fold-specific fitting and no leakage pathway** — distinct from leaky per-fold target aggregates.
 
 ---
 
-## Repository structure
+## Baseline
 
-```
-cdc_ml/
-├── cdc_ml/
-│   ├── config.py                  # paths and constants
-│   ├── datasets/
-│   │   ├── preference/
-│   │   │   └── schema.py          # pandera schemas (RawRecords, CleanedRecords, CleanedPreference)
-│   │   └── cycle/
-│   ├── features/
-│   │   └── build_features.py      # feature engineering pipeline
-│   ├── modeling/
-│   │   ├── data.py                # train/test split (make_holdout_split)
-│   │   ├── train.py               # training pipeline (CLI via typer)
-│   │   └── predict.py             # inference
-│   └── plots.py                   # all visualisation helpers
-├── models/
-│   ├── booking_model_v1.joblib    # production model (XGBoost + Platt)
-│   └── best_params.json           # hyperparameters from RandomizedSearchCV
-├── data/
-│   ├── processed/
-│   │   ├── polls_processed.parquet
-│   │   ├── customer_class_processed.parquet
-│   │   └── preference_processed.parquet
-│   └── metrics/
-│       ├── dev_oof_metrics.parquet
-│       └── prod_oof_metrics.parquet
-├── reports/
-│   └── figures/
-├── notebooks/
-│   └── 4_01-report.html           # this notebook
-└── pyproject.toml
-```
+Smoothed lookup tables on timing only (`polling_dow` + `polling_hour`), shrunk toward the base-rate logit to stabilize sparse cells:
+
+- **Additive LUT vs joint `dow × hour` LUT** are statistically indistinguishable (additive leads by +0.003 PR-AUC against a fold-to-fold SD of 0.013) → **no meaningful weekday×hour interaction.** SHAP later agrees.
+- Random Forest and XGBoost on the same features **converge to the additive LUT** — extra flexibility extracts nothing further from timing alone.
+- Time-only ceiling ≈ **2.1× base rate.** Any further lift must come from preference/customer features, not model complexity.
 
 ---
 
-## Reproducing the model
+## Feature ablation
 
-```bash
-# 1. Install
-pip install -e .
+On a small, imbalanced dataset, individual PR-AUC deltas are treated as **effect-size estimates, not significance tests.** Decisions rest on redundancy, parsimony, and effect size. Two passes: leave-one-out (marginal contribution) and group ablation (removing whole correlated blocks, since correlated features mask each other).
 
-# 2. Train (reads best_params.json, writes booking_model_v1.joblib + dev_oof_metrics.parquet)
-python -m cdc_ml.modeling.train
+| Stage | Action | Effect on pooled PR-AUC |
+|---|---|---|
+| 1 | Drop `pref_dow` (7 sparse weekday counts) | ≈ none → removed |
+| 2 | Collapse preference block to `pref_unique_timeslot` | Removing `coverage`/`unique_day`/`valid` together → no loss |
+| 3 | Validate the final 5 | Removing `class_type` −38%, `is_one_team` −43%, `pref_unique_timeslot` −54% |
 
-# 3. Predict for a customer
-python -m cdc_ml.modeling.predict --username <name>
-```
-
-Data cleaning and feature engineering run automatically as part of the pipeline. Pandera schemas enforce type and constraint validation on all intermediate tables.
+The instructive part: removing `pref_unique_timeslot` cost **~18% in the 8-feature model but ~54% in the 5-feature model.** The feature didn't get more predictive — pruning correlated preference variables **un-masked** its unique contribution.
 
 ---
 
-## Known limitations
+## Model, tuning & calibration
 
-1. **Sample conditioned on success.** Only cycles with ≥1 booking are retained. The dataset therefore describes a more easily-booked subset of the full customer base; reported booking rates are not population-level estimates.
-
-2. **No unseen holdout for the production model.** The production model is trained on all 37 customers. The only honest cold-start estimate for genuinely new customers is the dev test result (3.1× lift, 7 held-out users), which is noisy at that panel size.
-
-3. **Strong train–test distribution shift.** Adversarial validation yields AUC = 0.807, indicating the held-out test customers are substantially different from the training population. Preference features, which are per-user constants, are the primary driver.
-
-4. **Offline counterfactual evaluation.** Gains-curve results assume booking and cancellation behaviour would be unchanged under reduced polling. Live deployment is required to confirm operational savings.
-
-5. **Coarse time resolution.** Polls are aggregated to one-hour bins. Within-hour timing is unavailable.
-
-6. **No annual seasonality estimate.** The dataset spans ~9 months, which is insufficient to separate week-over-week patterns from any longer seasonal trend.
+- **XGBoost.** `RandomizedSearchCV` (`n_iter=50`) over the continuous hyperparameter space, scored on `average_precision`, under the same `StratifiedGroupKFold`-by-`username` protocol.
+- **`refit=False`** — search returns only `best_params_` → persisted to JSON → consumed by `train.py`. Hyperparameter selection and final training (with OOF generation + calibration) stay separate and reproducible from on-disk config, not notebook state.
+- **Platt scaling on pooled OOF predictions.** OOF scores come from models that never saw the held-out rows, so they're a representative deployment-like sample and avoid the optimism of calibrating on in-fold scores. Platt over isotonic because, with so few positives, isotonic's stepwise fit is unstable; the empirical curves show a smooth monotonic over-prediction that a 2-parameter logistic handles well.
 
 ---
 
-## Background
+## Results
 
-The polling bot and its supporting infrastructure (backend, frontend, database, Telegram notifications) were built from scratch as a separate project. `cdc_ml` is an ML layer added on top of that production system. The bot was operational before any ML work began; the model is therefore a performance optimisation, not a core dependency.
+Cold-start OOF is the primary estimate (aggregates all training customers under the grouped protocol); the untouched test set is a lower but less-biased reference.
+
+| | Users | Base rate | PR-AUC | Lift | 95% CI (lift) |
+|---|---|---|---|---|---|
+| **OOF (cold-start, dev)** | 30 | 1.4% | 0.071 | **5.1×** | [2.2×, 7.4×] |
+| Test (held out) | 7 | 1.1% | 0.034 | 3.1× | [1.7×, 5.6×] |
+| Production (retrained, all data) | 37 | 1.3% | 0.047 | 3.6× | [1.8×, 5.6×] |
+
+**On the OOF–test gap:** the intervals overlap heavily and the test point estimate sits inside the OOF CI, so there's no clean separation. The test set is tiny and high-variance (7 customers, 67 positives; its whale segment is effectively one customer), and adversarial validation shows moderate train↔test shift (**AUC ≈ 0.81**, though fixed per-customer preference signatures inflate this with only 7 holdout customers). Note that OOF also served as the *selection* metric for ablation and tuning, so it carries some optimism — the lower test number is consistent with that plus sampling noise, not evidence of a generalization failure.
+
+### Operational impact — gains curve
+
+If only the top X% of polls (by predicted probability) are kept, what share of bookings survives?
+
+| | XGBoost (final) | Additive baseline |
+|---|---|---|
+| Polls to retain **90%** of bookings | ~60% | ~62% |
+| Polls to retain 80% | ~43% | ~48% |
+| Polls to retain 95% | ~78% | ~77% |
+| Bookings within **top 10%** of polls | **~46%** | ~27% |
+
+Two takeaways: (1) most of the deployable value is already in the **timing signal** — ~90% of bookings retained at ~40% fewer polls is reachable with the time-only baseline; (2) XGBoost's edge concentrates at the **selective end** (46% vs 27% of bookings in the top 10%), i.e. it ranks the best opportunities higher. Headline: an expected **30–50% reduction in polling while retaining ~90% of bookings** (conservative end from OOF).
+
+### Per-customer guardrail
+
+The gains curve is an aggregate and skews toward whales, so recall is also checked **per customer** at a 60% polling budget. OOF: whales retain a median **92%** (worst 65%, n=4), non-whales **100%** (worst 0%, n=26). The zeros come from customers with 1–2 bookings, where one missed slot tanks a small denominator — coarse statistics, not systematic ranking failure. This flags potential "starvation" customers before deployment.
+
+---
+
+## Interpretation (SHAP)
+
+Mean-|SHAP| ranking: `polling_hour` > `pref_unique_timeslot` > `polling_dow` > `class_type` > `is_one_team`.
+
+- **`polling_hour`** — negative overnight/evening, positive across midday, consistent with cancellations clustering in daytime hours (the supply-side story).
+- **`pref_unique_timeslot`** — threshold-shaped: 6–7 distinct timeslots contribute positively, ≤5 negatively. Broader preferences = more chances to match a freed slot.
+- **SHAP vs ablation** look like they disagree (SHAP ranks `polling_hour` first; ablation hits hardest on `pref_unique_timeslot`) but they measure different things: mean-|SHAP| is average contribution to predicted log-odds (`polling_hour` touches every poll), while ablation measures lost **ranking** ability (`pref_unique_timeslot` does more to separate bookings from non-bookings). Complementary, not contradictory.
+- The `polling_hour` dependence plot shows little day-of-week separation — confirming the additive-vs-joint LUT finding that timing effects are additive.
+
+---
+
+## Limitations
+
+- **Sample-specific metrics** — success-conditioned, preference-conditioned sample; numbers are relative ranking quality, not population booking rates.
+- **Customer-level uncertainty** — most variance comes from the small customer count (7 in test), with moderate train↔test shift; hence customer-level bootstrap and OOF-as-primary.
+- **Offline counterfactual** — the gains curve assumes booking behavior is unchanged under reduced polling; only live deployment confirms real savings.
+- **Coarse, preference-conditioned scope** — hourly granularity, preference-window only. Mirrors the existing system, so a scope limit rather than a modeling defect.
+- **Seasonality** — 9 months can't establish annual effects.
+
+---
+
+## Operational use
+
+Deployment uses a **score quantile** rather than a fixed probability threshold (e.g. keep the top ~50% of polls), recomputed periodically to track score-distribution drift. Because OOF scores are calibrated, expected recall at any cutoff can be estimated directly from probability mass (Σ retained p / Σ all p) and monitored without waiting for outcomes — as long as calibration holds (the 0.81 adversarial AUC is a watch item here). Per-customer recall runs as a guardrail against uneven impact. The projected polling reduction is a **forecast**; a live experiment is required to confirm it.
+
+---
+
+## Stack
+
+Cookiecutter Data Science layout · `pandera` schemas · `typer` CLI · `loguru` · Parquet storage · XGBoost / scikit-learn / SHAP. Pipeline: `clean_records.py` → `features.py` → tuning → `train.py` (OOF + Platt calibration + artifacts).
