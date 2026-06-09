@@ -94,7 +94,7 @@ def train(df: pd.DataFrame, dev: bool = False) -> BookingModel:
     return calibrated_model
 
 
-def train_on_disk(data_path: Path, dev: bool = False):
+def train_on_disk(data_path: Path = STAGE_1_PROCESSED, dev: bool = False):
     logger.info(f"Training for {"dev" if dev else "prod"} env")
     logger.info(f"Loading processed data from {data_path}")
     df = pd.read_parquet(data_path)

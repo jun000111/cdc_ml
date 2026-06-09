@@ -137,7 +137,9 @@ def clean_df(df: pd.DataFrame) -> pd.DataFrame:
     return CleanedRecords.validate(df, lazy=True)
 
 
-def clean_from_disk(raw_input_path: Path, interim_output_path: Path) -> None:
+def clean_from_disk(
+    raw_input_path: Path = PROPER_RECORDS_RAW, interim_output_path: Path = PROPER_RECORDS_INTERIM
+) -> None:
     logger.info("Cleaning records...")
     df = pd.read_csv(raw_input_path)
     df_cleaned = clean_df(df)
@@ -146,7 +148,7 @@ def clean_from_disk(raw_input_path: Path, interim_output_path: Path) -> None:
     logger.success(f"Records cleaned and saved to {interim_output_path}")
 
 
-def fetch_from_disk(raw_out_path: Path) -> None:
+def fetch_from_disk(raw_out_path: Path = PROPER_RECORDS_RAW) -> None:
     logger.info("Fetching data from Neon...")
     engine = create_engine(DATABASE_URL)
     cutoff = pd.Timestamp("2026-05-01", tz=TIMEZONE)  # 2026-05-01 00:00 SGT
