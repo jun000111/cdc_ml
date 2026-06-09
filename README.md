@@ -83,6 +83,9 @@ OOF cold-start is the headline; the untouched test set is a lower but cleaner ch
 | **OOF (cold-start)** | 30 | 1.4% | 0.071 | **5.1×** | [2.2×, 7.4×] |
 | Test | 7 | 1.1% | 0.034 | 3.1× | [1.7×, 5.6×] |
 | Production (all data) | 37 | 1.3% | 0.047 | 3.6× | [1.8×, 5.6×] |
+![OOF](reports/figures/dev_train_bootstrap.png)
+![TEST](reports/figures/dev_test_bootstrap.png)
+![PROD](reports/figures/prod_bootstrap.png)
 
 The OOF–test gap is mostly noise: the CIs overlap, the test set is 7 customers (its whale segment is basically one person), and there's some train↔test shift (adversarial AUC 0.81). OOF also doubled as the selection metric, so it runs a bit optimistic — the lower test number fits that, not a generalization failure.
 
@@ -104,10 +107,10 @@ Importance: `polling_hour` > `pref_unique_timeslot` > `polling_dow` > `class_typ
 
 - `polling_hour` — negative overnight, positive midday: cancellations cluster in daytime.
 - `pref_unique_timeslot` — threshold shape, 6–7 slots help, ≤5 hurt: wider preferences mean more chances to match.
-- SHAP and ablation look like they disagree (SHAP ranks `polling_hour` first, ablation `pref_unique_timeslot`) but measure different things — average contribution to the score vs lost ranking power. Complementary, not conflicting.
+
 ![SHAP Beeswarm](reports/figures/shap_beeswarm.png)
 
-*Figure 4. SHAP beeswarm plot showing global feature importance and contribution direction.*
+*SHAP beeswarm plot showing global feature importance and contribution direction.*
 
 
 ## Limitations
