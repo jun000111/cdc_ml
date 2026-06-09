@@ -105,6 +105,10 @@ Importance: `polling_hour` > `pref_unique_timeslot` > `polling_dow` > `class_typ
 - `polling_hour` — negative overnight, positive midday: cancellations cluster in daytime.
 - `pref_unique_timeslot` — threshold shape, 6–7 slots help, ≤5 hurt: wider preferences mean more chances to match.
 - SHAP and ablation look like they disagree (SHAP ranks `polling_hour` first, ablation `pref_unique_timeslot`) but measure different things — average contribution to the score vs lost ranking power. Complementary, not conflicting.
+![SHAP Beeswarm](reports/figures/shap_beeswarm.png)
+
+*Figure 4. SHAP beeswarm plot showing global feature importance and contribution direction.*
+
 
 ## Limitations
 

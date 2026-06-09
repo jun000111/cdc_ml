@@ -10,6 +10,7 @@ import seaborn as sns
 import pandas as pd
 from cdc_ml.config import EXTERNAL_DATA_DIR
 from cdc_ml.modeling.predict import predict
+from cdc_ml.config import REPORTS_FIGURE
 
 
 from matplotlib.colors import ListedColormap
@@ -24,7 +25,8 @@ def boostrap_summary(df, p_cal, name):
     print(f"Model Score: {name} OOF")
     print("ALL")
     boots, point, base, hi, lo = pr_auc_ci_by_user(y_true, p_cal, groups)
-    bootstrap_distribution(boots, point, base, hi, lo)
+    fig = bootstrap_distribution(boots, point, base, hi, lo)
+    fig.savefig(REPORTS_FIGURE / f"{name}_bootstrap.png")
 
     print("WHALES")
     boots, point, base, hi, lo = pr_auc_ci_by_user(
@@ -32,7 +34,8 @@ def boostrap_summary(df, p_cal, name):
         p_cal[whales_mask],
         df.loc[whales_mask, "username"],
     )
-    bootstrap_distribution(boots, point, base, hi, lo)
+    fig = bootstrap_distribution(boots, point, base, hi, lo)
+    fig.savefig(REPORTS_FIGURE / f"{name}_bootstrap_whales.png")
 
     print("NON-WHALES")
     boots, point, base, hi, lo = pr_auc_ci_by_user(
@@ -40,7 +43,8 @@ def boostrap_summary(df, p_cal, name):
         p_cal[non_whales_mask],
         df.loc[non_whales_mask, "username"],
     )
-    bootstrap_distribution(boots, point, base, hi, lo)
+    fig = bootstrap_distribution(boots, point, base, hi, lo)
+    fig.savefig(REPORTS_FIGURE / f"{name}_bootstrap_non_whales.png")
 
 
 def production_visualization(
@@ -272,7 +276,9 @@ def concentration_share(df: pd.DataFrame):
 
 def bootstrap_distribution(boots, point, base, hi, lo, ax=None):
     if ax is None:
-        _, ax = plt.subplots(figsize=(7, 3.5))
+        fig, ax = plt.subplots(figsize=(7, 3.5))
+    else:
+        fig = ax.figure
 
     ax.hist(boots, bins=40, color="steelblue", alpha=0.7, edgecolor="white", linewidth=0.4)
     ax.axvline(
@@ -294,7 +300,7 @@ def bootstrap_distribution(boots, point, base, hi, lo, ax=None):
     ax.set_title("PR-AUC bootstrap distribution")
     ax.legend(fontsize=8)
     plt.tight_layout()
-    plt.show()
+    return fig
 
 
 def booking_rate_plot(df: pd.DataFrame, target):
