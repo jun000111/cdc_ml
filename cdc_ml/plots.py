@@ -4,7 +4,8 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.ticker import PercentFormatter
 from sklearn.linear_model import LogisticRegression
 from cdc_ml.modeling.calibrate import *
-from cdc_ml.modeling.evaluation import gains_bootstrap
+from cdc_ml.modeling.evaluation import gains_bootstrap, pr_auc_ci_by_user
+from cdc_ml.features.build_features import get_whale_users, get_pc_user, get_pt_user
 import seaborn as sns
 import pandas as pd
 from cdc_ml.config import EXTERNAL_DATA_DIR
@@ -12,6 +13,34 @@ from cdc_ml.modeling.predict import predict
 
 
 from matplotlib.colors import ListedColormap
+
+
+def boostrap_summary(df, p_cal, name):
+
+    y_true = df["has_booking"].to_numpy()
+    groups = df["username"].to_numpy()
+    whales_mask, non_whales_mask = get_pt_user(df)
+
+    print(f"Model Score: {name} OOF")
+    print("ALL")
+    boots, point, base, hi, lo = pr_auc_ci_by_user(y_true, p_cal, groups)
+    bootstrap_distribution(boots, point, base, hi, lo)
+
+    print("WHALES")
+    boots, point, base, hi, lo = pr_auc_ci_by_user(
+        y_true[whales_mask],
+        p_cal[whales_mask],
+        df.loc[whales_mask, "username"],
+    )
+    bootstrap_distribution(boots, point, base, hi, lo)
+
+    print("NON-WHALES")
+    boots, point, base, hi, lo = pr_auc_ci_by_user(
+        y_true[non_whales_mask],
+        p_cal[non_whales_mask],
+        df.loc[non_whales_mask, "username"],
+    )
+    bootstrap_distribution(boots, point, base, hi, lo)
 
 
 def production_visualization(
@@ -287,9 +316,8 @@ def booking_rate_plot(df: pd.DataFrame, target):
 
 
 def plot_calibration_by_volume(
+    df,
     p_pred,
-    y_true,
-    is_whale,
     *,
     n_bins=10,
     title="Calibration by polling volume (pooled OOF)",
@@ -306,8 +334,8 @@ def plot_calibration_by_volume(
     n_bins : requested quantile bins (effective count may be lower).
     """
     p_pred = np.asarray(p_pred, dtype=float)
-    y_true = np.asarray(y_true, dtype=float)
-    is_whale = np.asarray(is_whale, dtype=bool)
+    y_true = df["has_booking"].to_numpy()
+    is_whale, _ = get_pc_user(df)
 
     segments = {
         "whale (high n_polls)": (is_whale, "#2563eb"),

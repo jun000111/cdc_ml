@@ -105,6 +105,20 @@ def get_whale_users(poll_threshold: float = 0.5, booking_threshold: float = 0.5)
     return whales_pc_users, whales_pt_users
 
 
+def get_pc_user(df):
+    whales_pc, _ = get_whale_users()
+    whales_pc_mask_train = df["username"].isin(whales_pc).to_numpy()
+    non_whales_pc_mask_train = ~df["username"].isin(whales_pc).to_numpy()
+    return whales_pc_mask_train, non_whales_pc_mask_train
+
+
+def get_pt_user(df):
+    _, whales_pt = get_whale_users()
+    whales_pt_mask_train = df["username"].isin(whales_pt).to_numpy()
+    non_whales_pt_mask_train = ~df["username"].isin(whales_pt).to_numpy()
+    return whales_pt_mask_train, non_whales_pt_mask_train
+
+
 def assign_class_type(df_poll: pd.DataFrame, df_class: pd.DataFrame):
     """left join the records with the class type"""
     df = df_poll.merge(df_class, on="username", how="left")

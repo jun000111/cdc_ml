@@ -45,14 +45,14 @@ POLLS_PROCESSED = PROCESSED_DATA_DIR / "polls.parquet"
 
 STAGE_1_PROCESSED = PROCESSED_DATA_DIR / "stage_1.parquet"
 
-FEATURE_ABLATIONS_RESULTS = REPORTS_DIR / "feat_ab.jsonl"
-
 BOOKING_MODEL = MODELS_DIR / "booking_model_v1.joblib"
 BEST_PARAMS = MODELS_DIR / "best_params.json"
-OOF = MODELS_DIR / "oof.parquet"
+DEV_OOF_METRICS = MODELS_DIR / "dev_oof.parquet"
+PROD_OOF_METRICS = MODELS_DIR / "prod_oof.parquet"
 OOF_ADD = MODELS_DIR / "oof_add.npy"
 
 REPORTS_FIGURE = REPORTS_DIR / "figures"
+FEATURE_ABLATIONS_RESULTS = REPORTS_DIR / "feat_ab.jsonl"
 
 
 # If tqdm is installed, configure loguru with tqdm.write
