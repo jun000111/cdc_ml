@@ -107,9 +107,24 @@ The OOF–test gap is mostly noise: the CIs overlap, the test set is 7 customers
 | Polls to keep 80% | ~43% | ~48% |
 | Bookings in **top 10%** of polls | **~46%** | ~27% |
 
+![GAIN_ADD_XGV](reports/figures/gain_curve_xgb_add.png)
+
+*Gain curve for XGB and the basline additive model*
+
 Most of the value is in timing alone — even the baseline keeps ~90% of bookings at ~40% fewer polls. XGBoost's edge shows up at the selective end (46% vs 27% in the top 10%). Headline: **30–50% fewer polls, ~90% of bookings kept.**
 
 **Per-customer guardrail** — at a 60% polling budget, whales keep a median 92% of bookings, non-whales 100%. The occasional zero is a customer with 1–2 bookings where one miss tanks a tiny denominator — useful for catching starvation cases before launch.
+
+![PER_OOF](reports/figures/recall_by_segement_oof.png)
+
+*Recall by segement of the OOF prediction*
+![PER_OOF](reports/figures/recall_by_segement_test.png)
+
+*Recall by segement of the held out test set*
+
+![PER_OOF](reports/figures/recall_by_segement_prod.png)
+
+*Recall by segement of the OOF prediction on the full dataset*
 
 ## Interpretation (SHAP)
 
