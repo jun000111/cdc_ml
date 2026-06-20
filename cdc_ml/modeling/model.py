@@ -5,7 +5,7 @@ class BookingModel:
     def __init__(self, booster, calibrator, feature_names):
         self.booster = booster  # fitted XGBoost
         self.calibrator = calibrator  # fitted Platt LogisticRegression
-        self.feature_names = feature_names  # locked order — XGBoost is silent if cols reorder
+        self.feature_names = feature_names
 
     def predict_proba(self, raw_df):
         X = raw_df[self.feature_names]

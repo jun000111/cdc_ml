@@ -22,12 +22,6 @@ def calibrate_proba(proba, platt):
 def wilson_interval(k, n, z=1.96):
     """Calibration reliability diagrams segmented by polling-volume whales.
 
-    Drop into your viz/plotting module. Main entry point is
-    `plot_calibration_by_volume`, which takes pooled OOF predictions and plots
-    whale vs non-whale reliability curves with Wilson CIs plus prediction
-    histograms underneath.
-
-    Design choices baked in:
     * Segment on EXPOSURE (n_polls / is_whale), never on positive count — the
         slice must not be conditioned on the label.
     * Quantile (equal-count) bins, not equal-width, so no bin is mostly empty
@@ -38,11 +32,7 @@ def wilson_interval(k, n, z=1.96):
     * Prediction histogram (log y) under the reliability axes so sparsity in the
         low-volume segment is visible rather than hidden.
 
-    Read points BELOW the diagonal as overprediction (observed < predicted) — the
-    non-whale failure mode you diagnosed.
-    """
-
-    """95% Wilson score interval for a binomial proportion.
+    95% Wilson score interval for a binomial proportion.
 
     Returns (p_hat, lower, upper). p_hat is the raw observed frequency (the
     plotted point); the interval is the Wilson score interval, which stays

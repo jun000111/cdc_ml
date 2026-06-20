@@ -67,7 +67,6 @@ def production_visualization(
     cycles_df = pd.read_excel(EXTERNAL_DATA_DIR / "cus_cycle.xlsx")
     predictions_df = predict(preferences_df, cycles_df)
 
-    # Global operating point: the (1 - retention) quantile over ALL polls.
     if threshold is None:
         threshold = float(predictions_df["pred"].quantile(1 - retention))
 
@@ -83,8 +82,6 @@ def production_visualization(
         )
     ]
 
-    # FIX 2: real date for chronological ordering; the "8-9" vs "8-12" string
-    # sort would otherwise put "8-12" before "8-9".
     user_predictions["date_key"] = pd.to_datetime(
         pd.DataFrame(
             {
@@ -117,7 +114,6 @@ def production_visualization(
 
     fig, ax = plt.subplots(figsize=(16, 8))
 
-    # Skipped cells: flat grey, muted annotations.
     sns.heatmap(
         heatmap_df,
         mask=kept,
@@ -130,7 +126,6 @@ def production_visualization(
         linecolor="white",
         ax=ax,
     )
-    # Kept cells: Blues, auto-contrast annotations.
     sns.heatmap(
         heatmap_df,
         mask=~kept,
@@ -414,8 +409,6 @@ def bootstrapped_gain_curve(res, ax=None):
 
     if ax is None:
         fig, ax = plt.subplots(figsize=(8, 8))
-
-    # if your calibrated OOF preds are an array: df_train = df_train.assign(p_oof_cal=p_oof_cal)
 
     g, lo, med, hi = res["grid"] * 100, res["lo"] * 100, res["med"] * 100, res["hi"] * 100
     b_lo, b_med, b_hi = res["budget_ci"] * 100

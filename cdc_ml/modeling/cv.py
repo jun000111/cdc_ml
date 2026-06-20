@@ -157,7 +157,7 @@ def run_cv(
             p = average_precision_score(y, oof[name])
             return {
                 "brier_pooled": b,
-                "brier_lift": b / (base * (1 - base)),  # vs constant-base-rate forecast
+                "brier_lift": b / (base * (1 - base)),
                 "brier_folds": fold_brier[name],
                 "pr_auc_pooled": p,
                 "pr_auc_lift": p / base,
