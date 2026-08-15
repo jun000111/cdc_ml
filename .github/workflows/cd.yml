@@ -25,4 +25,5 @@ jobs:
           pip install -e .
 
       - name: Run scoring
-        run: cdc_ml score  # replace with your actual CLI command
+        run: 
+          python -m cdc_ml.score
