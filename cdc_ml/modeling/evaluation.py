@@ -72,9 +72,9 @@ def production_predictions_to_excel(
         f"~{exp_recall:.0%} expected bookings retained"
     )
 
-    if output_path is None:
-        output_path = PROCESSED_DATA_DIR / f"{username}_{user_id}_polling_scores.xlsx"
-    out.to_excel(output_path, index=False)
+    # if output_path is None:
+    #     output_path = PROCESSED_DATA_DIR / f"{username}_{user_id}_polling_scores.xlsx"
+    # out.to_excel(output_path, index=False)
     return out
 
 
