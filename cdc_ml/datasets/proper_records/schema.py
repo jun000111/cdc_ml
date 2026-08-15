@@ -9,8 +9,8 @@ class CleanedRecords(pa.DataFrameModel):
     lesson_at: Series[pd.DatetimeTZDtype] = pa.Field(dtype_kwargs={"tz": str(TIMEZONE)})
     booking_at: Series[pd.DatetimeTZDtype] = pa.Field(
         dtype_kwargs={"tz": str(TIMEZONE)},
-        ge=pd.Timestamp("2025-08-01", tz=TIMEZONE),
-        le=pd.Timestamp("2026-05-01", tz=TIMEZONE),
+        ge=pd.Timestamp("2025-12-01", tz=TIMEZONE),
+        le=pd.Timestamp("2026-12-01", tz=TIMEZONE),
     )
 
     @pa.dataframe_check

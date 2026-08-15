@@ -10,7 +10,7 @@ class CleanedCycle(pa.DataFrameModel):
         dtype_kwargs={
             "tz": str(TIMEZONE),
         },
-        le=pd.Timestamp("2026-05-01", tz=TIMEZONE),
+        le=pd.Timestamp("2026-12-01", tz=TIMEZONE),
         ge=pd.Timestamp("2025-08-01", tz=TIMEZONE),
     )
 
@@ -18,7 +18,7 @@ class CleanedCycle(pa.DataFrameModel):
         dtype_kwargs={
             "tz": str(TIMEZONE),
         },
-        le=pd.Timestamp("2026-05-01", tz=TIMEZONE),
+        le=pd.Timestamp("2026-12-01", tz=TIMEZONE),
         ge=pd.Timestamp("2025-08-01", tz=TIMEZONE),
     )
 

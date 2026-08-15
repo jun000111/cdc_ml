@@ -7,6 +7,75 @@ from sklearn.model_selection import cross_val_score
 from sklearn.ensemble import RandomForestClassifier
 from scipy.stats import chi2_contingency
 from cdc_ml.config import FEATURE_ABLATIONS_RESULTS
+from pathlib import Path
+from cdc_ml.config import EXTERNAL_DATA_DIR, PROCESSED_DATA_DIR
+from cdc_ml.modeling.predict import predict
+
+
+def production_predictions_to_excel(
+    username: str,
+    end_month: int,
+    end_day: int,
+    user_id: int = 6,
+    threshold: float | None = None,
+    retention: float | None = 0.8,
+    year: int = 2026,
+    output_path: Path | None = None,
+) -> pd.DataFrame:
+    """Per-customer polling scores under a score cutoff, written to Excel.
+
+    One row per (polling date, polling hour) slot with the model's predicted
+    booking probability and whether the bot would poll it. Pass an absolute
+    `threshold`, or a `retention` fraction (keep the top X% of polls) — the
+    threshold is then the matching quantile of the *system-wide* score
+    distribution, i.e. the real production operating point applied to this
+    one customer.
+    """
+    preferences_df = pd.read_excel(EXTERNAL_DATA_DIR / "cus_pref.xlsx")
+    cycles_df = pd.read_excel(EXTERNAL_DATA_DIR / "cus_cycle.xlsx")
+    predictions_df = predict(preferences_df, cycles_df)
+
+    if threshold is None:
+        threshold = float(predictions_df["pred"].quantile(1 - retention))
+
+    user_predictions = predictions_df.loc[
+        (predictions_df["username"] == username) & (predictions_df["id"] == user_id)
+    ].copy()
+
+    user_predictions = user_predictions.loc[
+        (user_predictions["polling_month"] < end_month)
+        | (
+            (user_predictions["polling_month"] == end_month)
+            & (user_predictions["polling_day"] <= end_day)
+        )
+    ]
+
+    user_predictions["date_key"] = pd.to_datetime(
+        pd.DataFrame(
+            {
+                "year": year,
+                "month": user_predictions["polling_month"],
+                "day": user_predictions["polling_day"],
+            }
+        )
+    )
+    user_predictions["polling_date"] = user_predictions["date_key"].dt.date
+
+    out = user_predictions.sort_values(["date_key", "polling_hour"]).rename(
+        columns={"pred": "score"}
+    )[["username", "polling_date", "polling_hour", "score"]]
+
+    scores = out["score"].to_numpy()
+    exp_recall = scores[scores >= threshold].sum() / scores.sum() if scores.sum() else 0.0
+    print(
+        f"{username} — threshold {threshold:.3f}  ·  "
+        f"~{exp_recall:.0%} expected bookings retained"
+    )
+
+    if output_path is None:
+        output_path = PROCESSED_DATA_DIR / f"{username}_{user_id}_polling_scores.xlsx"
+    out.to_excel(output_path, index=False)
+    return out
 
 
 def baseline_pr_auc():
