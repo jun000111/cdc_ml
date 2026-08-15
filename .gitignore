@@ -1,5 +1,8 @@
 # Data
 /data/
+!data/external/
+!data/external/cus_pref.xlsx
+!data/external/cus_cycle.xlsx
 
 # Mac OS-specific storage files
 .DS_Store
