@@ -10,6 +10,7 @@ jobs:
 
     env: 
       DATABASE_URL: ${{secrets.DATABASE_URL}}
+      SALT: ${{secrets.SALT}}
 
     steps:
       - uses: actions/checkout@v4
