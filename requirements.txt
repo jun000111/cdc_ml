@@ -13,3 +13,4 @@ SQLAlchemy==2.0.52
 tqdm==4.67.3
 typer==0.27.1
 xgboost==3.4.0
+psycopg2==2.9.12
