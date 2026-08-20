@@ -74,8 +74,6 @@ The tell: dropping `pref_unique_timeslot` cost **18% in the 8-feature model but 
 
 ## Results
 
-OOF cold-start is the headline; the untouched test set is a lower but cleaner check.
-
 | | Users | Base | PR-AUC | Lift | 95% CI |
 |---|---|---|---|---|---|
 | **OOF (cold-start)** | 30 | 1.4% | 0.071 | **5.1×** | [2.2×, 7.4×] |
