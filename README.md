@@ -4,8 +4,6 @@ Ranks each poll by how likely it is to land a slot, so the system can **skip the
 
 A production bot re-checks each customer's preferred day/time slots every few minutes and grabs slots that open up when other learners cancel. Polling is cheap per-poll but adds up. This model scores upcoming polls so we keep only the high-value ones.
 
-The key wrinkle: the signal is **supply-side**. A slot appears only when someone cancels, so the question isn't "does the customer want this slot" (they already said so) but "is a matching slot likely to free up around now." That makes it a problem about *when* polls happen and *how wide* a customer's preferences are.
-
 Full writeup is in `4.01-report`; this is the summary.
 
 ## Data
