@@ -4,8 +4,6 @@ Ranks each poll by how likely it is to land a slot, so the system can **skip the
 
 A production bot re-checks each customer's preferred day/time slots every few minutes and grabs slots that open up when other learners cancel. Polling is cheap per-poll but adds up. This model scores upcoming polls so we keep only the high-value ones.
 
-The key wrinkle: the signal is **supply-side**. A slot appears only when someone cancels, so the question isn't "does the customer want this slot" (they already said so) but "is a matching slot likely to free up around now." That makes it a problem about *when* polls happen and *how wide* a customer's preferences are.
-
 Full writeup is in `4.01-report`; this is the summary.
 
 ## Data
@@ -18,7 +16,7 @@ Full writeup is in `4.01-report`; this is the summary.
 | Span | ~9 months |
 | Validation | Pandera schemas on every table (timestamp integrity, `pref_start < pref_end`, range checks) |
 
-Two biases worth stating up front, since they decide what the metrics mean:
+Two biases:
 
 - **Success-conditioned** — almost every retained cycle has ≥1 booking, which over-represents easy customers and compresses the real gap between one-team and common-pool groups.
 - **Preference-conditioned** — the bot only polls inside declared preferences, so the data only covers those regions. Anything outside is extrapolation — but that's exactly how the live system behaves too.
@@ -75,8 +73,6 @@ The tell: dropping `pref_unique_timeslot` cost **18% in the 8-feature model but 
 - **Platt scaling on pooled OOF** — OOF scores never saw their own rows, so they mimic deployment. Platt over isotonic because there are too few positives for isotonic to stay stable.
 
 ## Results
-
-OOF cold-start is the headline; the untouched test set is a lower but cleaner check.
 
 | | Users | Base | PR-AUC | Lift | 95% CI |
 |---|---|---|---|---|---|
